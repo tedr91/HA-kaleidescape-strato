@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Iterable
 from typing import Any
 
-from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
+from homeassistant.components.remote import RemoteEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
@@ -31,7 +31,6 @@ class KaleidescapeRemoteEntity(RemoteEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_should_poll = False
-    _attr_supported_features = RemoteEntityFeature.SEND_COMMAND
 
     def __init__(self, entry: ConfigEntry, client) -> None:
         self._entry = entry
