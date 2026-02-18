@@ -57,3 +57,7 @@ data:
 
 - Confirm protocol-level command names and behavior with the Kaleidescape protocol reference.
 - Network access from Home Assistant to the Strato host/port is required.
+
+## Release process
+
+- See [RELEASING.md](RELEASING.md) for annotated tag conventions and commands.
