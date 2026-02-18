@@ -1,9 +1,11 @@
 {
   "domain": "kaleidescape_strato",
   "name": "Kaleidescape Strato",
-  "codeowners": ["@tedr"],
+  "codeowners": ["@tedr91"],
   "config_flow": true,
-  "documentation": "https://github.com/tedr/kaleidescape-strato-ha",
+  "documentation": "https://github.com/tedr91/HA-kaleidescape-strato",
+  "issue_tracker": "https://github.com/tedr91/HA-kaleidescape-strato/issues",
+  "integration_type": "device",
   "iot_class": "local_push",
   "loggers": ["custom_components.kaleidescape_strato"],
   "requirements": [],

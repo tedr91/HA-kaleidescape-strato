@@ -25,6 +25,14 @@ The built-in integration is limited to a narrower command set on the `remote` en
 4. Search for **Kaleidescape Strato**.
 5. Enter host/port for your player.
 
+## Installation (HACS)
+
+1. In Home Assistant, open **HACS → Integrations**.
+2. Select the menu and choose **Custom repositories**.
+3. Add this repository URL and category **Integration**.
+4. Find **Kaleidescape Strato** in HACS and install it.
+5. Restart Home Assistant and add the integration from **Settings → Devices & Services**.
+
 ## Using commands
 
 You can call Home Assistant service `remote.send_command` against this entity.
@@ -61,3 +69,10 @@ data:
 ## Release process
 
 - See [RELEASING.md](RELEASING.md) for annotated tag conventions and commands.
+
+## HACS release readiness
+
+- `hacs.json` is present at repository root.
+- Integration is under `custom_components/kaleidescape_strato`.
+- `manifest.json` includes versioning and integration metadata.
+- GitHub Releases are triggered by `v*` tags via workflow automation.

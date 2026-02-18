@@ -26,3 +26,14 @@ def test_manifest_domain_is_correct() -> None:
 
     assert manifest["domain"] == "kaleidescape_strato"
     assert manifest["config_flow"] is True
+    assert manifest["integration_type"] == "device"
+    assert manifest["version"]
+    assert manifest["documentation"].startswith("https://github.com/tedr91/HA-kaleidescape-strato")
+
+
+def test_hacs_metadata_is_present() -> None:
+    hacs_path = ROOT / "hacs.json"
+    hacs = json.loads(hacs_path.read_text(encoding="utf-8"))
+
+    assert "kaleidescape_strato" in hacs["domains"]
+    assert hacs["content_in_root"] is False
