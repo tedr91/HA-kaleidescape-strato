@@ -10,6 +10,10 @@
           "port": "Port",
           "timeout": "Timeout (seconds)"
         }
+      },
+      "discovery_confirm": {
+        "title": "Kaleidescape Strato",
+        "description": "Discovered {name}. Confirm setup to add this player."
       }
     },
     "error": {
