@@ -1,0 +1,37 @@
+from __future__ import annotations
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+
+from .api import KaleidescapeClient
+from .const import DEFAULT_PORT, DEFAULT_TIMEOUT, DOMAIN, PLATFORMS
+
+type KaleidescapeConfigEntry = ConfigEntry
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> bool:
+    hass.data.setdefault(DOMAIN, {})
+
+    client = KaleidescapeClient(
+        host=entry.data["host"],
+        port=entry.data.get("port", DEFAULT_PORT),
+        timeout=entry.data.get("timeout", DEFAULT_TIMEOUT),
+    )
+
+    hass.data[DOMAIN][entry.entry_id] = {"client": client}
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> bool:
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+    return unloaded
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> None:
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)

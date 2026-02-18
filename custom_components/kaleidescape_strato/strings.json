@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kaleidescape Strato",
+        "description": "Connect to a Kaleidescape Strato player",
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "port": "Port",
+          "timeout": "Timeout (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the Strato player"
+    },
+    "abort": {
+      "already_configured": "This Strato player is already configured"
+    }
+  }
+}

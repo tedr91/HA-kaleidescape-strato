@@ -1,0 +1,7 @@
+{
+  "name": "Kaleidescape Strato",
+  "content_in_root": false,
+  "domains": ["kaleidescape_strato"],
+  "render_readme": true,
+  "homeassistant": ">=2025.1.0"
+}
