@@ -23,11 +23,12 @@ POWER_ON_COMMAND = "LEAVE_STANDBY"
 POWER_OFF_COMMAND = "ENTER_STANDBY"
 
 
-def _supported_features() -> int:
-    features = 0
+def _supported_features() -> RemoteEntityFeature:
+    features = RemoteEntityFeature(0)
     for feature_name in ("SEND_COMMAND", "TURN_ON", "TURN_OFF", "TOGGLE"):
-        feature_value = getattr(RemoteEntityFeature, feature_name, 0)
-        features |= int(feature_value) if feature_value else 0
+        feature_value = getattr(RemoteEntityFeature, feature_name, None)
+        if feature_value is not None:
+            features |= feature_value
     return features
 
 

@@ -23,8 +23,8 @@ POWER_OFF_COMMAND = "ENTER_STANDBY"
 PLAYING_STATES = {"playing", "forward", "reverse"}
 
 
-def _supported_features() -> int:
-    features = 0
+def _supported_features() -> MediaPlayerEntityFeature:
+    features = MediaPlayerEntityFeature(0)
     for feature_name in (
         "TURN_ON",
         "TURN_OFF",
@@ -34,8 +34,9 @@ def _supported_features() -> int:
         "NEXT_TRACK",
         "PREVIOUS_TRACK",
     ):
-        feature_value = getattr(MediaPlayerEntityFeature, feature_name, 0)
-        features |= int(feature_value) if feature_value else 0
+        feature_value = getattr(MediaPlayerEntityFeature, feature_name, None)
+        if feature_value is not None:
+            features |= feature_value
     return features
 
 
