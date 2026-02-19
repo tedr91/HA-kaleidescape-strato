@@ -13,7 +13,7 @@ CONF_ALLOW_RAW_COMMANDS = "allow_raw_commands"
 DEFAULT_ALLOW_RAW_COMMANDS = False
 DATA_IS_MOVIE_PLAYER = "is_movie_player"
 DATA_DEVICE_TYPE = "device_type"
-PLATFORMS: list[Platform] = [Platform.REMOTE, Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.REMOTE, Platform.SENSOR, Platform.MEDIA_PLAYER]
 
 COMMAND_ALIASES: dict[str, str] = {
     "up": "UP",
