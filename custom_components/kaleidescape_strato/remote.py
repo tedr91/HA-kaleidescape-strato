@@ -71,6 +71,14 @@ class KaleidescapeRemoteEntity(RemoteEntity):
         self._attr_is_on = True
 
     @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._attr_is_on)
+
+    @property
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self._entry.entry_id)},
