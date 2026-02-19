@@ -3,8 +3,9 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, CONF_TIMEOUT
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.service_info.ssdp import (
     ATTR_UPNP_FRIENDLY_NAME,
@@ -13,7 +14,14 @@ from homeassistant.helpers.service_info.ssdp import (
 )
 
 from .api import KaleidescapeClient
-from .const import DEFAULT_NAME, DEFAULT_PORT, DEFAULT_TIMEOUT, DOMAIN
+from .const import (
+    CONF_DEBUG_COMMANDS,
+    DEFAULT_DEBUG_COMMANDS,
+    DEFAULT_NAME,
+    DEFAULT_PORT,
+    DEFAULT_TIMEOUT,
+    DOMAIN,
+)
 
 
 class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -21,6 +29,11 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     _discovered_host: str | None = None
     _discovered_name: str = DEFAULT_NAME
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return KaleidescapeStratoOptionsFlow(config_entry)
 
     async def async_step_user(self, user_input: dict | None = None) -> FlowResult:
         errors: dict[str, str] = {}
@@ -110,3 +123,25 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_TIMEOUT: DEFAULT_TIMEOUT,
             },
         )
+
+
+class KaleidescapeStratoOptionsFlow(OptionsFlow):
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        self._config_entry = config_entry
+
+    async def async_step_init(self, user_input: dict | None = None) -> FlowResult:
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_DEBUG_COMMANDS,
+                    default=self._config_entry.options.get(
+                        CONF_DEBUG_COMMANDS,
+                        DEFAULT_DEBUG_COMMANDS,
+                    ),
+                ): bool,
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=data_schema)

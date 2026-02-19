@@ -6,6 +6,8 @@ DOMAIN = "kaleidescape_strato"
 DEFAULT_NAME = "Kaleidescape Strato"
 DEFAULT_PORT = 10000
 DEFAULT_TIMEOUT = 5.0
+CONF_DEBUG_COMMANDS = "debug_commands"
+DEFAULT_DEBUG_COMMANDS = False
 PLATFORMS: list[Platform] = [Platform.REMOTE]
 
 COMMAND_ALIASES: dict[str, str] = {

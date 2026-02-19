@@ -18,10 +18,17 @@ def _build_payload(command: str) -> bytes:
 
 
 class KaleidescapeClient:
-    def __init__(self, host: str, port: int, timeout: float) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        timeout: float,
+        debug_commands: bool = False,
+    ) -> None:
         self._host = host
         self._port = port
         self._timeout = timeout
+        self._debug_commands = debug_commands
 
     async def async_can_connect(self) -> bool:
         try:
@@ -43,13 +50,18 @@ class KaleidescapeClient:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(self._host, self._port), timeout=self._timeout
             )
+            if self._debug_commands:
+                _LOGGER.info("Kaleidescape command send: %s", payload.decode("latin-1").strip())
             writer.write(payload)
             await writer.drain()
 
             response = await asyncio.wait_for(reader.readline(), timeout=self._timeout)
             if response:
                 decoded_response = response.decode(errors="ignore").strip()
-                _LOGGER.debug("Kaleidescape command response: %s", decoded_response)
+                if self._debug_commands:
+                    _LOGGER.info("Kaleidescape command response: %s", decoded_response)
+                else:
+                    _LOGGER.debug("Kaleidescape command response: %s", decoded_response)
         finally:
             if writer is not None:
                 writer.close()

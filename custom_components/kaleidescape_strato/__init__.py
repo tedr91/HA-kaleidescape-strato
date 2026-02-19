@@ -4,7 +4,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .api import KaleidescapeClient
-from .const import DEFAULT_PORT, DEFAULT_TIMEOUT, DOMAIN, PLATFORMS
+from .const import (
+    CONF_DEBUG_COMMANDS,
+    DEFAULT_DEBUG_COMMANDS,
+    DEFAULT_PORT,
+    DEFAULT_TIMEOUT,
+    DOMAIN,
+    PLATFORMS,
+)
 
 type KaleidescapeConfigEntry = ConfigEntry
 
@@ -16,6 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry)
         host=entry.data["host"],
         port=entry.data.get("port", DEFAULT_PORT),
         timeout=entry.data.get("timeout", DEFAULT_TIMEOUT),
+        debug_commands=entry.options.get(CONF_DEBUG_COMMANDS, DEFAULT_DEBUG_COMMANDS),
     )
 
     hass.data[DOMAIN][entry.entry_id] = {"client": client}

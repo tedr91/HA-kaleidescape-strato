@@ -22,5 +22,15 @@
     "abort": {
       "already_configured": "This Strato player is already configured"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Kaleidescape Strato options",
+        "data": {
+          "debug_commands": "Enable command debug logging"
+        }
+      }
+    }
   }
 }
