@@ -89,7 +89,7 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_ssdp(self, discovery_info: SsdpServiceInfo) -> FlowResult:
-        """Handle SSDP discovery for Kaleidescape players."""
+        """Handle SSDP discovery for Kaleidescape devices."""
         if discovery_info.ssdp_location is None:
             return self.async_abort(reason="cannot_connect")
 
@@ -103,7 +103,6 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
 
         await self.async_set_unique_id(
             self._discovery_unique_id(discovery_info, discovered_host),
-            raise_on_progress=False,
         )
         self._abort_if_unique_id_configured(updates={CONF_HOST: discovered_host})
 
@@ -125,7 +124,7 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_discovery_confirm(
         self, user_input: dict | None = None
     ) -> FlowResult:
-        """Confirm setup of a discovered Kaleidescape player."""
+        """Confirm setup of a discovered Kaleidescape device."""
         if self._discovered_host is None:
             return self.async_abort(reason="cannot_connect")
 

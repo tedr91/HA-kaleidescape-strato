@@ -1,6 +1,6 @@
 {
   "domain": "kaleidescape_strato",
-  "name": "Kaleidescape Strato",
+  "name": "Kaleidescape Strato/Terra",
   "codeowners": ["@tedr91"],
   "config_flow": true,
   "documentation": "https://github.com/tedr91/HA-kaleidescape-strato",
@@ -15,5 +15,5 @@
     }
   ],
   "requirements": [],
-  "version": "0.1.13"
+  "version": "0.1.14"
 }

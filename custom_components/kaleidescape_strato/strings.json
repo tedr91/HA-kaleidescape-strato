@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Kaleidescape Strato",
-        "description": "Connect to a Kaleidescape Strato player",
+        "title": "Kaleidescape Strato/Terra",
+        "description": "Connect to a Kaleidescape Strato player or Terra server",
         "data": {
           "name": "Name",
           "host": "Host",
@@ -12,21 +12,21 @@
         }
       },
       "discovery_confirm": {
-        "title": "Kaleidescape Strato",
-        "description": "Discovered {name}. Confirm setup to add this player."
+        "title": "Kaleidescape Strato/Terra",
+        "description": "Discovered {name}. Confirm setup to add this device."
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to the Strato player"
+      "cannot_connect": "Failed to connect to the Kaleidescape device"
     },
     "abort": {
-      "already_configured": "This Strato player is already configured"
+      "already_configured": "This Kaleidescape device is already configured"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Kaleidescape Strato options",
+        "title": "Kaleidescape options",
         "data": {
           "debug_commands": "Enable command debug logging"
         }

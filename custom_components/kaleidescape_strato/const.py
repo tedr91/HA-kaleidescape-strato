@@ -3,7 +3,7 @@ from __future__ import annotations
 from homeassistant.const import Platform
 
 DOMAIN = "kaleidescape_strato"
-DEFAULT_NAME = "Kaleidescape Strato"
+DEFAULT_NAME = "Kaleidescape"
 DEFAULT_PORT = 10000
 DEFAULT_TIMEOUT = 5.0
 SENSOR_SCAN_INTERVAL = 5
