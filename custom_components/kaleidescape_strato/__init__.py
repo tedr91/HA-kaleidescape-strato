@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
@@ -18,6 +20,8 @@ from .coordinator import KaleidescapeSensorCoordinator
 
 type KaleidescapeConfigEntry = ConfigEntry
 
+_LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
@@ -28,7 +32,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry)
         timeout=entry.data.get("timeout", DEFAULT_TIMEOUT),
         debug_commands=entry.options.get(CONF_DEBUG_COMMANDS, DEFAULT_DEBUG_COMMANDS),
     )
-    is_movie_player, device_type = await client.async_get_device_profile()
+    is_movie_player = True
+    device_type = "Kaleidescape"
+    try:
+        is_movie_player, device_type = await client.async_get_device_profile()
+    except Exception:
+        _LOGGER.debug("Unable to detect Kaleidescape device profile at setup", exc_info=True)
 
     coordinator = KaleidescapeSensorCoordinator(
         hass,
@@ -36,7 +45,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry)
         client,
         include_player_metrics=is_movie_player,
     )
-    await coordinator.async_refresh()
+    try:
+        await coordinator.async_refresh()
+    except Exception:
+        _LOGGER.debug("Initial Kaleidescape sensor refresh failed", exc_info=True)
 
     hass.data[DOMAIN][entry.entry_id] = {
         "client": client,
