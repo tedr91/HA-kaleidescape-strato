@@ -8,9 +8,16 @@ from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import COMMAND_ALIASES, DEFAULT_NAME, DOMAIN
+from .const import (
+    COMMAND_ALIASES,
+    CONF_ALLOW_RAW_COMMANDS,
+    DEFAULT_ALLOW_RAW_COMMANDS,
+    DEFAULT_NAME,
+    DOMAIN,
+)
 
 POWER_ON_COMMAND = "LEAVE_STANDBY"
 POWER_OFF_COMMAND = "ENTER_STANDBY"
@@ -24,9 +31,18 @@ def _supported_features() -> int:
     return features
 
 
-def _normalize_command(command: str) -> str:
+def _normalize_command(command: str, *, allow_raw_commands: bool) -> str:
     lowered = command.strip().lower()
-    return COMMAND_ALIASES.get(lowered, command.strip())
+    if lowered in COMMAND_ALIASES:
+        return COMMAND_ALIASES[lowered]
+
+    if allow_raw_commands:
+        return command.strip()
+
+    raise HomeAssistantError(
+        "Raw commands are disabled. Enable 'Allow sending raw commands to device' "
+        "in options to use passthrough commands."
+    )
 
 
 async def async_setup_entry(
@@ -47,6 +63,10 @@ class KaleidescapeRemoteEntity(RemoteEntity):
     def __init__(self, entry: ConfigEntry, client) -> None:
         self._entry = entry
         self._client = client
+        self._allow_raw_commands = entry.options.get(
+            CONF_ALLOW_RAW_COMMANDS,
+            DEFAULT_ALLOW_RAW_COMMANDS,
+        )
         self._attr_unique_id = f"{entry.entry_id}_remote"
         self._attr_is_on = True
 
@@ -67,7 +87,10 @@ class KaleidescapeRemoteEntity(RemoteEntity):
 
         for repeat_index in range(num_repeats):
             for command_index, raw_command in enumerate(commands):
-                resolved = _normalize_command(raw_command)
+                resolved = _normalize_command(
+                    raw_command,
+                    allow_raw_commands=self._allow_raw_commands,
+                )
                 await self._client.async_send_command(resolved)
 
                 last_command = command_index == len(commands) - 1

@@ -16,7 +16,9 @@ from homeassistant.helpers.service_info.ssdp import (
 
 from .api import KaleidescapeClient
 from .const import (
+    CONF_ALLOW_RAW_COMMANDS,
     CONF_DEBUG_COMMANDS,
+    DEFAULT_ALLOW_RAW_COMMANDS,
     DEFAULT_DEBUG_COMMANDS,
     DEFAULT_NAME,
     DEFAULT_PORT,
@@ -161,6 +163,13 @@ class KaleidescapeStratoOptionsFlow(OptionsFlow):
                     default=self._config_entry.options.get(
                         CONF_DEBUG_COMMANDS,
                         DEFAULT_DEBUG_COMMANDS,
+                    ),
+                ): bool,
+                vol.Required(
+                    CONF_ALLOW_RAW_COMMANDS,
+                    default=self._config_entry.options.get(
+                        CONF_ALLOW_RAW_COMMANDS,
+                        DEFAULT_ALLOW_RAW_COMMANDS,
                     ),
                 ): bool,
             }

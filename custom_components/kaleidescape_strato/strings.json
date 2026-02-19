@@ -28,7 +28,8 @@
       "init": {
         "title": "Kaleidescape options",
         "data": {
-          "debug_commands": "Enable command debug logging"
+          "debug_commands": "Enable command debug logging",
+          "allow_raw_commands": "Allow sending raw commands to device"
         }
       }
     }
