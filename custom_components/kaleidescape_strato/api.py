@@ -316,7 +316,7 @@ class KaleidescapeClient:
     async def async_query_playback_state(
         self, *, include_player_metrics: bool = True
     ) -> dict[str, str | int | None]:
-        commands = ["GET_SYSTEM_READINESS_STATE", "GET_DEVICE_POWER_STATE"]
+        commands = ["GET_SYSTEM_READINESS_STATE", "GET_DEVICE_POWER_STATE", "GET_DEVICE_INFO"]
         if include_player_metrics:
             commands.extend(
                 [
@@ -334,6 +334,9 @@ class KaleidescapeClient:
         responses = await self.async_send_requests(commands)
 
         state: dict[str, str | int | float | None] = {
+            "serial": None,
+            "cpdid": None,
+            "device_ip": None,
             "media_location": None,
             "play_status": None,
             "play_speed": None,
@@ -370,7 +373,23 @@ class KaleidescapeClient:
         cinemascape_mask_response = responses.get("GET_CINEMASCAPE_MASK")
         system_readiness_response = responses.get("GET_SYSTEM_READINESS_STATE")
         device_power_response = responses.get("GET_DEVICE_POWER_STATE")
+        device_info_response = responses.get("GET_DEVICE_INFO")
         ui_state_response = responses.get("GET_UI_STATE")
+
+        if (
+            device_info_response
+            and device_info_response.status == 0
+            and device_info_response.name == "DEVICE_INFO"
+            and len(device_info_response.fields) >= 4
+        ):
+            serial_value = device_info_response.fields[1].strip()
+            cpdid_value = device_info_response.fields[2].strip()
+            ip_value = device_info_response.fields[3].strip()
+
+            if serial_value:
+                state["serial"] = serial_value.zfill(12)
+            state["cpdid"] = cpdid_value or None
+            state["device_ip"] = ip_value or None
 
         if include_player_metrics and (
             play_status_response

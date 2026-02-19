@@ -13,6 +13,9 @@ from .const import DOMAIN, SENSOR_SCAN_INTERVAL
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_PLAYBACK_STATE: dict[str, str | int | float] = {
+    "serial": "",
+    "cpdid": "",
+    "device_ip": "",
     "media_location": "none",
     "play_status": "none",
     "play_speed": 0,

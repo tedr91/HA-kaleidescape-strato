@@ -22,6 +22,24 @@ class KaleidescapeSensorDescription(SensorEntityDescription):
 
 SHARED_SENSOR_TYPES: tuple[KaleidescapeSensorDescription, ...] = (
     KaleidescapeSensorDescription(
+        key="serial",
+        name="Serial",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda state: state.get("serial"),
+    ),
+    KaleidescapeSensorDescription(
+        key="cpdid",
+        name="Cpdid",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda state: state.get("cpdid"),
+    ),
+    KaleidescapeSensorDescription(
+        key="device_ip",
+        name="Device ip",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda state: state.get("device_ip"),
+    ),
+    KaleidescapeSensorDescription(
         key="system_readiness_state",
         name="System readiness state",
         entity_category=EntityCategory.DIAGNOSTIC,
