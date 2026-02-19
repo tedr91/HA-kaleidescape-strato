@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -18,8 +19,7 @@ from .const import (
 )
 from .coordinator import KaleidescapeSensorCoordinator
 
-type KaleidescapeConfigEntry = ConfigEntry
-type KaleidescapePlatform = str
+KaleidescapeConfigEntry = ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 DATA_LOADED_PLATFORMS = "loaded_platforms"
@@ -59,7 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry)
         DATA_DEVICE_TYPE: device_type,
     }
 
-    loaded_platforms: list[KaleidescapePlatform] = []
+    loaded_platforms: list[Any] = []
     for platform in PLATFORMS:
         try:
             await hass.config_entries.async_forward_entry_setups(entry, [platform])
