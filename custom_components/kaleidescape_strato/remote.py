@@ -4,13 +4,24 @@ import asyncio
 from collections.abc import Iterable
 from typing import Any
 
-from homeassistant.components.remote import RemoteEntity
+from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import COMMAND_ALIASES, DEFAULT_NAME, DOMAIN
+
+POWER_ON_COMMAND = "LEAVE_STANDBY"
+POWER_OFF_COMMAND = "ENTER_STANDBY"
+
+
+def _supported_features() -> int:
+    features = 0
+    for feature_name in ("SEND_COMMAND", "TURN_ON", "TURN_OFF"):
+        feature_value = getattr(RemoteEntityFeature, feature_name, 0)
+        features |= int(feature_value) if feature_value else 0
+    return features
 
 
 def _normalize_command(command: str) -> str:
@@ -31,6 +42,7 @@ class KaleidescapeRemoteEntity(RemoteEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_should_poll = False
+    _attr_supported_features = _supported_features()
 
     def __init__(self, entry: ConfigEntry, client) -> None:
         self._entry = entry
@@ -62,3 +74,11 @@ class KaleidescapeRemoteEntity(RemoteEntity):
                 last_repeat = repeat_index == num_repeats - 1
                 if not (last_command and last_repeat):
                     await asyncio.sleep(delay_secs)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._client.async_send_command(POWER_ON_COMMAND)
+        self._attr_is_on = True
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._client.async_send_command(POWER_OFF_COMMAND)
+        self._attr_is_on = False

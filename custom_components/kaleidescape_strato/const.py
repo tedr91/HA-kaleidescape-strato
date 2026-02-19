@@ -30,4 +30,10 @@ COMMAND_ALIASES: dict[str, str] = {
     "rewind": "SCAN_REVERSE",
     "fast_forward": "SCAN_FORWARD",
     "info": "INFO",
+    "power_on": "LEAVE_STANDBY",
+    "turn_on": "LEAVE_STANDBY",
+    "on": "LEAVE_STANDBY",
+    "power_off": "ENTER_STANDBY",
+    "turn_off": "ENTER_STANDBY",
+    "off": "ENTER_STANDBY",
 }
