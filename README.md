@@ -15,6 +15,7 @@ The built-in integration is limited to a narrower command set on the `remote` en
 - Config Flow setup (UI)
 - TCP connectivity to a Strato player
 - `remote` entity with `send_command`
+- Playback and diagnostic sensors, including media/playback state, video output, masking, and UI/system telemetry
 - permissive command handling (unknown commands are sent as-is)
 
 ## Installation (manual)
