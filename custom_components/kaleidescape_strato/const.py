@@ -58,5 +58,6 @@ COMMAND_ALIASES: dict[str, str] = {
     "kaleidescape_menu_on": "KALEIDESCAPE_MENU_ON",
     "kaleidescape_menu_off": "KALEIDESCAPE_MENU_OFF",
     "navigation": "SHOW_NAVIGATION_OVERLAY",
+    "navigation_overlay": "SHOW_NAVIGATION_OVERLAY",
     "shuffle_covers": "SHUFFLE_COVER_ART",
 }

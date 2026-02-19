@@ -124,6 +124,46 @@ class KaleidescapeMediaPlayerEntity(
         return None
 
     @property
+    def media_title(self) -> str | None:
+        if not self.coordinator.data:
+            return None
+        title = self.coordinator.data.get("media_title")
+        if isinstance(title, str) and title.strip():
+            return title
+        return None
+
+    @property
+    def media_content_id(self) -> str | None:
+        if not self.coordinator.data:
+            return None
+        content_id = self.coordinator.data.get("media_content_id")
+        if isinstance(content_id, str) and content_id.strip():
+            return content_id
+        return None
+
+    @property
+    def media_content_type(self) -> str | None:
+        if not self.coordinator.data:
+            return None
+        content_type = self.coordinator.data.get("media_content_type")
+        if isinstance(content_type, str) and content_type.strip() and content_type != "none":
+            return content_type
+        return None
+
+    @property
+    def media_image_url(self) -> str | None:
+        if not self.coordinator.data:
+            return None
+        image_url = self.coordinator.data.get("media_image_url")
+        if isinstance(image_url, str) and image_url.strip():
+            return image_url
+        return None
+
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        return True
+
+    @property
     def media_position_updated_at(self) -> datetime | None:
         if self.state == MediaPlayerState.PLAYING:
             return utcnow()

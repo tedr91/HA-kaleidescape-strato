@@ -321,6 +321,9 @@ class KaleidescapeClient:
             commands.extend(
                 [
                     "GET_PLAY_STATUS",
+                    "GET_PLAYING_TITLE_NAME",
+                    "GET_HIGHLIGHTED_SELECTION",
+                    "GET_MOVIE_MEDIA_TYPE",
                     "GET_MOVIE_LOCATION",
                     "GET_VIDEO_MODE",
                     "GET_VIDEO_COLOR",
@@ -344,6 +347,10 @@ class KaleidescapeClient:
             "title_location": None,
             "chapter_length": None,
             "chapter_location": None,
+            "media_title": None,
+            "media_content_id": None,
+            "media_content_type": None,
+            "media_image_url": None,
             "video_mode": None,
             "video_color_eotf": None,
             "video_color_space": None,
@@ -365,6 +372,9 @@ class KaleidescapeClient:
         }
 
         play_status_response = responses.get("GET_PLAY_STATUS")
+        playing_title_name_response = responses.get("GET_PLAYING_TITLE_NAME")
+        highlighted_selection_response = responses.get("GET_HIGHLIGHTED_SELECTION")
+        movie_media_type_response = responses.get("GET_MOVIE_MEDIA_TYPE")
         movie_location_response = responses.get("GET_MOVIE_LOCATION")
         video_mode_response = responses.get("GET_VIDEO_MODE")
         video_color_response = responses.get("GET_VIDEO_COLOR")
@@ -403,6 +413,48 @@ class KaleidescapeClient:
             state["title_location"] = _parse_int(play_status_response.fields[4])
             state["chapter_length"] = _parse_int(play_status_response.fields[6])
             state["chapter_location"] = _parse_int(play_status_response.fields[7])
+
+        if include_player_metrics and (
+            playing_title_name_response
+            and playing_title_name_response.status == 0
+            and playing_title_name_response.name == "PLAYING_TITLE_NAME"
+            and playing_title_name_response.fields
+        ):
+            title_name = playing_title_name_response.fields[0].strip()
+            if title_name:
+                state["media_title"] = title_name
+
+        if include_player_metrics and (
+            movie_media_type_response
+            and movie_media_type_response.status == 0
+            and movie_media_type_response.name == "MOVIE_MEDIA_TYPE"
+            and movie_media_type_response.fields
+        ):
+            media_type = movie_media_type_response.fields[0].strip().lower()
+            state["media_content_type"] = media_type or None
+
+        if include_player_metrics and (
+            highlighted_selection_response
+            and highlighted_selection_response.status == 0
+            and highlighted_selection_response.name == "HIGHLIGHTED_SELECTION"
+            and highlighted_selection_response.fields
+        ):
+            highlighted_handle = highlighted_selection_response.fields[0].strip()
+            if highlighted_handle:
+                state["media_content_id"] = highlighted_handle
+                content_details_command = (
+                    f"{LOCAL_CPDID}/0/GET_CONTENT_DETAILS:{highlighted_handle}:"
+                )
+                content_details_response = await self.async_send_request(content_details_command)
+                if (
+                    content_details_response
+                    and content_details_response.status == 0
+                    and content_details_response.name == "CONTENT_DETAILS_OVERVIEW"
+                    and len(content_details_response.fields) >= 4
+                ):
+                    if not state.get("media_title"):
+                        state["media_title"] = content_details_response.fields[1].strip() or None
+                    state["media_image_url"] = content_details_response.fields[2].strip() or None
 
         if include_player_metrics and (
             movie_location_response
