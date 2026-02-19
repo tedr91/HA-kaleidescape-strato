@@ -6,6 +6,8 @@ from homeassistant.core import HomeAssistant
 from .api import KaleidescapeClient
 from .const import (
     CONF_DEBUG_COMMANDS,
+    DATA_DEVICE_TYPE,
+    DATA_IS_MOVIE_PLAYER,
     DEFAULT_DEBUG_COMMANDS,
     DEFAULT_PORT,
     DEFAULT_TIMEOUT,
@@ -26,12 +28,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry)
         timeout=entry.data.get("timeout", DEFAULT_TIMEOUT),
         debug_commands=entry.options.get(CONF_DEBUG_COMMANDS, DEFAULT_DEBUG_COMMANDS),
     )
-    coordinator = KaleidescapeSensorCoordinator(hass, entry, client)
+    is_movie_player, device_type = await client.async_get_device_profile()
+
+    coordinator = KaleidescapeSensorCoordinator(
+        hass,
+        entry,
+        client,
+        include_player_metrics=is_movie_player,
+    )
     await coordinator.async_refresh()
 
     hass.data[DOMAIN][entry.entry_id] = {
         "client": client,
         "sensor_coordinator": coordinator,
+        DATA_IS_MOVIE_PLAYER: is_movie_player,
+        DATA_DEVICE_TYPE: device_type,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -41,14 +41,17 @@ DEFAULT_PLAYBACK_STATE: dict[str, str | int | float] = {
 }
 
 
-class KaleidescapeSensorCoordinator(DataUpdateCoordinator[dict[str, str | int | None]]):
+class KaleidescapeSensorCoordinator(DataUpdateCoordinator[dict[str, str | int | float | None]]):
     def __init__(
         self,
         hass: HomeAssistant,
         entry: ConfigEntry,
         client: KaleidescapeClient,
+        *,
+        include_player_metrics: bool,
     ) -> None:
         self._client = client
+        self._include_player_metrics = include_player_metrics
         super().__init__(
             hass,
             _LOGGER,
@@ -57,8 +60,10 @@ class KaleidescapeSensorCoordinator(DataUpdateCoordinator[dict[str, str | int | 
             update_interval=timedelta(seconds=SENSOR_SCAN_INTERVAL),
         )
 
-    async def _async_update_data(self) -> dict[str, str | int | None]:
-        response = await self._client.async_query_playback_state()
+    async def _async_update_data(self) -> dict[str, str | int | float | None]:
+        response = await self._client.async_query_playback_state(
+            include_player_metrics=self._include_player_metrics
+        )
         return {
             key: response.get(key)
             if response.get(key) is not None

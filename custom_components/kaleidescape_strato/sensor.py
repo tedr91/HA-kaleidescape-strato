@@ -11,16 +11,32 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DEFAULT_NAME, DOMAIN
+from .const import DATA_DEVICE_TYPE, DATA_IS_MOVIE_PLAYER, DEFAULT_NAME, DOMAIN
 from .coordinator import KaleidescapeSensorCoordinator
 
 
 @dataclass(frozen=True, kw_only=True)
 class KaleidescapeSensorDescription(SensorEntityDescription):
-    value_fn: Callable[[dict[str, str | int | None]], StateType]
+    value_fn: Callable[[dict[str, str | int | float | None]], StateType]
 
 
-SENSOR_TYPES: tuple[KaleidescapeSensorDescription, ...] = (
+SHARED_SENSOR_TYPES: tuple[KaleidescapeSensorDescription, ...] = (
+    KaleidescapeSensorDescription(
+        key="system_readiness_state",
+        name="System readiness state",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda state: state.get("system_readiness_state"),
+    ),
+    KaleidescapeSensorDescription(
+        key="power_state",
+        name="Power state",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda state: state.get("power_state"),
+    ),
+)
+
+
+PLAYER_SENSOR_TYPES: tuple[KaleidescapeSensorDescription, ...] = (
     KaleidescapeSensorDescription(
         key="media_location",
         name="Media location",
@@ -119,18 +135,6 @@ SENSOR_TYPES: tuple[KaleidescapeSensorDescription, ...] = (
         value_fn=lambda state: state.get("cinemascape_mask"),
     ),
     KaleidescapeSensorDescription(
-        key="system_readiness_state",
-        name="System readiness state",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("system_readiness_state"),
-    ),
-    KaleidescapeSensorDescription(
-        key="power_state",
-        name="Power state",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("power_state"),
-    ),
-    KaleidescapeSensorDescription(
         key="ui_screen",
         name="Ui screen",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -183,9 +187,14 @@ async def async_setup_entry(
     coordinator: KaleidescapeSensorCoordinator = hass.data[DOMAIN][entry.entry_id][
         "sensor_coordinator"
     ]
+    is_movie_player: bool = hass.data[DOMAIN][entry.entry_id][DATA_IS_MOVIE_PLAYER]
+
+    sensor_types = SHARED_SENSOR_TYPES
+    if is_movie_player:
+        sensor_types += PLAYER_SENSOR_TYPES
 
     async_add_entities(
-        KaleidescapeSensorEntity(entry, coordinator, description) for description in SENSOR_TYPES
+        KaleidescapeSensorEntity(entry, coordinator, description) for description in sensor_types
     )
 
 
@@ -207,10 +216,13 @@ class KaleidescapeSensorEntity(CoordinatorEntity[KaleidescapeSensorCoordinator],
 
     @property
     def device_info(self):
+        device_type = self.hass.data[DOMAIN][self._entry.entry_id].get(
+            DATA_DEVICE_TYPE, "Kaleidescape"
+        )
         return {
             "identifiers": {(DOMAIN, self._entry.entry_id)},
             "manufacturer": "Kaleidescape",
-            "model": "Strato",
+            "model": str(device_type),
             "name": self._entry.data.get(CONF_NAME, DEFAULT_NAME),
         }
 

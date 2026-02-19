@@ -10,6 +10,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.service_info.ssdp import (
     ATTR_UPNP_FRIENDLY_NAME,
     ATTR_UPNP_SERIAL,
+    ATTR_UPNP_UDN,
     SsdpServiceInfo,
 )
 
@@ -29,6 +30,22 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     _discovered_host: str | None = None
     _discovered_name: str = DEFAULT_NAME
+
+    @staticmethod
+    def _discovery_unique_id(discovery_info: SsdpServiceInfo, host: str) -> str:
+        upnp_udn = discovery_info.ssdp_udn or discovery_info.upnp.get(ATTR_UPNP_UDN)
+        if upnp_udn:
+            return f"udn:{str(upnp_udn).strip().lower()}"
+
+        ssdp_usn = discovery_info.ssdp_usn
+        if ssdp_usn:
+            return f"usn:{ssdp_usn.split('::', 1)[0].strip().lower()}"
+
+        serial_number = discovery_info.upnp.get(ATTR_UPNP_SERIAL)
+        if serial_number:
+            return f"serial:{str(serial_number).strip().lower()}"
+
+        return f"host:{host.strip().lower()}"
 
     @staticmethod
     @callback
@@ -80,9 +97,14 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
         if discovered_host is None:
             return self.async_abort(reason="cannot_connect")
 
-        serial_number = str(discovery_info.upnp.get(ATTR_UPNP_SERIAL, discovered_host))
+        for entry in self._async_current_entries():
+            if entry.data.get(CONF_HOST) == discovered_host:
+                return self.async_abort(reason="already_configured")
 
-        await self.async_set_unique_id(serial_number, raise_on_progress=False)
+        await self.async_set_unique_id(
+            self._discovery_unique_id(discovery_info, discovered_host),
+            raise_on_progress=False,
+        )
         self._abort_if_unique_id_configured(updates={CONF_HOST: discovered_host})
 
         client = KaleidescapeClient(

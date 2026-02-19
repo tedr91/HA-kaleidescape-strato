@@ -286,21 +286,52 @@ class KaleidescapeClient:
                 writer.close()
                 await writer.wait_closed()
 
-    async def async_query_playback_state(self) -> dict[str, str | int | None]:
-        responses = await self.async_send_requests(
-            [
-                "GET_PLAY_STATUS",
-                "GET_MOVIE_LOCATION",
-                "GET_VIDEO_MODE",
-                "GET_VIDEO_COLOR",
-                "GET_SCREEN_MASK",
-                "GET_CINEMASCAPE_MODE",
-                "GET_CINEMASCAPE_MASK",
-                "GET_SYSTEM_READINESS_STATE",
-                "GET_DEVICE_POWER_STATE",
-                "GET_UI_STATE",
-            ]
-        )
+    async def async_get_device_profile(self) -> tuple[bool, str]:
+        responses = await self.async_send_requests(["GET_NUM_ZONES", "GET_DEVICE_TYPE_NAME"])
+        num_zones_response = responses.get("GET_NUM_ZONES")
+        device_type_response = responses.get("GET_DEVICE_TYPE_NAME")
+
+        is_movie_player = True
+        if (
+            num_zones_response
+            and num_zones_response.status == 0
+            and num_zones_response.name == "NUM_ZONES"
+            and len(num_zones_response.fields) >= 1
+        ):
+            movie_zones = _parse_int(num_zones_response.fields[0])
+            if movie_zones is not None:
+                is_movie_player = movie_zones > 0
+
+        device_type = "Kaleidescape"
+        if (
+            device_type_response
+            and device_type_response.status == 0
+            and device_type_response.name == "DEVICE_TYPE_NAME"
+            and device_type_response.fields
+        ):
+            device_type = device_type_response.fields[0]
+
+        return is_movie_player, device_type
+
+    async def async_query_playback_state(
+        self, *, include_player_metrics: bool = True
+    ) -> dict[str, str | int | None]:
+        commands = ["GET_SYSTEM_READINESS_STATE", "GET_DEVICE_POWER_STATE"]
+        if include_player_metrics:
+            commands.extend(
+                [
+                    "GET_PLAY_STATUS",
+                    "GET_MOVIE_LOCATION",
+                    "GET_VIDEO_MODE",
+                    "GET_VIDEO_COLOR",
+                    "GET_SCREEN_MASK",
+                    "GET_CINEMASCAPE_MODE",
+                    "GET_CINEMASCAPE_MASK",
+                    "GET_UI_STATE",
+                ]
+            )
+
+        responses = await self.async_send_requests(commands)
 
         state: dict[str, str | int | float | None] = {
             "media_location": None,
@@ -341,7 +372,7 @@ class KaleidescapeClient:
         device_power_response = responses.get("GET_DEVICE_POWER_STATE")
         ui_state_response = responses.get("GET_UI_STATE")
 
-        if (
+        if include_player_metrics and (
             play_status_response
             and play_status_response.status == 0
             and play_status_response.name == "PLAY_STATUS"
@@ -354,7 +385,7 @@ class KaleidescapeClient:
             state["chapter_length"] = _parse_int(play_status_response.fields[6])
             state["chapter_location"] = _parse_int(play_status_response.fields[7])
 
-        if (
+        if include_player_metrics and (
             movie_location_response
             and movie_location_response.status == 0
             and movie_location_response.name == "MOVIE_LOCATION"
@@ -364,7 +395,7 @@ class KaleidescapeClient:
                 movie_location_response.fields[0], MOVIE_LOCATION_INDEX
             )
 
-        if (
+        if include_player_metrics and (
             video_mode_response
             and video_mode_response.status == 0
             and video_mode_response.name == "VIDEO_MODE"
@@ -372,7 +403,7 @@ class KaleidescapeClient:
         ):
             state["video_mode"] = _decode_index(video_mode_response.fields[2], VIDEO_MODE_INDEX)
 
-        if (
+        if include_player_metrics and (
             video_color_response
             and video_color_response.status == 0
             and video_color_response.name == "VIDEO_COLOR"
@@ -391,7 +422,7 @@ class KaleidescapeClient:
                 video_color_response.fields[3], VIDEO_COLOR_SAMPLING_INDEX
             )
 
-        if (
+        if include_player_metrics and (
             screen_mask_response
             and screen_mask_response.status == 0
             and screen_mask_response.name == "SCREEN_MASK"
@@ -416,7 +447,7 @@ class KaleidescapeClient:
                 _parse_int(screen_mask_response.fields[5]) or 0
             ) / 10.0
 
-        if (
+        if include_player_metrics and (
             cinemascape_mode_response
             and cinemascape_mode_response.status == 0
             and cinemascape_mode_response.name == "CINEMASCAPE_MODE"
@@ -426,7 +457,7 @@ class KaleidescapeClient:
                 cinemascape_mode_response.fields[0], CINEMASCAPE_MODE_INDEX
             )
 
-        if (
+        if include_player_metrics and (
             cinemascape_mask_response
             and cinemascape_mask_response.status == 0
             and cinemascape_mask_response.name == "CINEMASCAPE_MASK"
@@ -452,7 +483,7 @@ class KaleidescapeClient:
         ):
             state["power_state"] = _decode_index(device_power_response.fields[0], POWER_STATE_INDEX)
 
-        if (
+        if include_player_metrics and (
             ui_state_response
             and ui_state_response.status == 0
             and ui_state_response.name == "UI_STATE"
