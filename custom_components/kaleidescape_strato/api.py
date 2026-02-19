@@ -5,6 +5,17 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
+LOCAL_CPDID = "01"
+
+
+def _build_payload(command: str) -> bytes:
+    normalized = command.strip()
+    if "/" in normalized:
+        wire_command = normalized
+    else:
+        wire_command = f"{LOCAL_CPDID}/0/{normalized.upper()}:"
+    return f"{wire_command}\n".encode("latin-1")
+
 
 class KaleidescapeClient:
     def __init__(self, host: str, port: int, timeout: float) -> None:
@@ -25,7 +36,7 @@ class KaleidescapeClient:
             return False
 
     async def async_send_command(self, command: str) -> None:
-        payload = f"{command.strip()}\r\n".encode()
+        payload = _build_payload(command)
         reader = None
         writer = None
         try:
@@ -34,7 +45,11 @@ class KaleidescapeClient:
             )
             writer.write(payload)
             await writer.drain()
-            await asyncio.sleep(0)
+
+            response = await asyncio.wait_for(reader.readline(), timeout=self._timeout)
+            if response:
+                decoded_response = response.decode(errors="ignore").strip()
+                _LOGGER.debug("Kaleidescape command response: %s", decoded_response)
         finally:
             if writer is not None:
                 writer.close()
