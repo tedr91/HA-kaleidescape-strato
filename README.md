@@ -135,6 +135,27 @@ Entity IDs use your configured device name slug. If your integration name is
 - `sensor.kaleidescape_strato_ui_popup`
 - `sensor.kaleidescape_strato_ui_dialog`
 
+## Lovelace example card
+
+```yaml
+type: entities
+title: Kaleidescape Strato
+show_header_toggle: false
+entities:
+  - entity: remote.kaleidescape_strato
+    name: Remote
+  - entity: sensor.kaleidescape_strato_play_status
+    name: Play status
+  - entity: sensor.kaleidescape_strato_play_speed
+    name: Play speed
+  - entity: sensor.kaleidescape_strato_media_location
+    name: Media location
+  - entity: sensor.kaleidescape_strato_video_mode
+    name: Video mode
+  - entity: sensor.kaleidescape_strato_power_state
+    name: Power state
+```
+
 ## Notes
 
 - Confirm protocol-level command names and behavior with the Kaleidescape protocol reference.

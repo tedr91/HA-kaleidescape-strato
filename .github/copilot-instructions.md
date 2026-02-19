@@ -34,3 +34,5 @@
 - Work through each checklist item systematically.
 - Keep communication concise and focused.
 - Follow development best practices.
+- User workflow preference: Do not commit, push, tag, create releases, or bump versions automatically. Always pause after local edits/tests and wait for explicit user approval before any of those actions.
+- Publish trigger rule: If the user says "publish", "publish it", or "let's publish", proceed with version bumping and publish steps (commit/push/tag/release) at that time.

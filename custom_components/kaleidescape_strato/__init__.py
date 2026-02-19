@@ -12,6 +12,7 @@ from .const import (
     DOMAIN,
     PLATFORMS,
 )
+from .coordinator import KaleidescapeSensorCoordinator
 
 type KaleidescapeConfigEntry = ConfigEntry
 
@@ -25,8 +26,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry)
         timeout=entry.data.get("timeout", DEFAULT_TIMEOUT),
         debug_commands=entry.options.get(CONF_DEBUG_COMMANDS, DEFAULT_DEBUG_COMMANDS),
     )
+    coordinator = KaleidescapeSensorCoordinator(hass, entry, client)
+    await coordinator.async_refresh()
 
-    hass.data[DOMAIN][entry.entry_id] = {"client": client}
+    hass.data[DOMAIN][entry.entry_id] = {
+        "client": client,
+        "sensor_coordinator": coordinator,
+    }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))

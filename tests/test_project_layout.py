@@ -12,7 +12,9 @@ def test_integration_files_exist() -> None:
         INTEGRATION_DIR / "manifest.json",
         INTEGRATION_DIR / "__init__.py",
         INTEGRATION_DIR / "config_flow.py",
+        INTEGRATION_DIR / "coordinator.py",
         INTEGRATION_DIR / "remote.py",
+        INTEGRATION_DIR / "sensor.py",
         ROOT / "README.md",
         ROOT / "hacs.json",
     ]
