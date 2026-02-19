@@ -18,7 +18,7 @@ POWER_OFF_COMMAND = "ENTER_STANDBY"
 
 def _supported_features() -> int:
     features = 0
-    for feature_name in ("SEND_COMMAND", "TURN_ON", "TURN_OFF"):
+    for feature_name in ("SEND_COMMAND", "TURN_ON", "TURN_OFF", "TOGGLE"):
         feature_value = getattr(RemoteEntityFeature, feature_name, 0)
         features |= int(feature_value) if feature_value else 0
     return features
@@ -82,3 +82,9 @@ class KaleidescapeRemoteEntity(RemoteEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self._client.async_send_command(POWER_OFF_COMMAND)
         self._attr_is_on = False
+
+    async def async_toggle(self, **kwargs: Any) -> None:
+        if self._attr_is_on:
+            await self.async_turn_off(**kwargs)
+            return
+        await self.async_turn_on(**kwargs)
