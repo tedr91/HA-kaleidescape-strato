@@ -62,6 +62,48 @@ data:
 
 `up` maps to `UP`, while unknown values are sent unchanged.
 
+## Exposed sensors
+
+### Core playback sensors
+
+- `media_location`: Where playback is in the title (for example `content`, `credits`, `disc_menu`).
+- `play_status`: Current transport mode (for example `playing`, `paused`, `forward`, `reverse`).
+- `play_speed`: Current transport speed value reported by the player.
+
+### Playback telemetry sensors
+
+- `title_location`: Current position within the title.
+- `title_length`: Total title length.
+- `chapter_location`: Current position within the chapter.
+- `chapter_length`: Total chapter length.
+
+### Video diagnostics
+
+- `video_mode`: Current output video mode/resolution profile.
+- `video_color_eotf`: Active transfer function (for example SDR/HDR).
+- `video_color_space`: Active color space.
+- `video_color_depth`: Active color depth.
+- `video_color_sampling`: Active chroma sampling mode.
+
+### Masking and Cinemascape diagnostics
+
+- `screen_mask_ratio`: Reported content aspect ratio for masking.
+- `screen_mask_top_trim_rel`: Top trim percentage.
+- `screen_mask_bottom_trim_rel`: Bottom trim percentage.
+- `screen_mask_conservative_ratio`: Conservative mask ratio recommendation.
+- `screen_mask_top_mask_abs`: Absolute top mask percentage.
+- `screen_mask_bottom_mask_abs`: Absolute bottom mask percentage.
+- `cinemascape_mode`: Current Cinemascape mode.
+- `cinemascape_mask`: Current Cinemascape mask value.
+
+### System and UI diagnostics
+
+- `system_readiness_state`: Player readiness state.
+- `power_state`: Reported power state.
+- `ui_screen`: Current on-screen UI screen.
+- `ui_popup`: Current popup state.
+- `ui_dialog`: Current dialog state.
+
 ## Notes
 
 - Confirm protocol-level command names and behavior with the Kaleidescape protocol reference.
