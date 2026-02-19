@@ -104,6 +104,37 @@ data:
 - `ui_popup`: Current popup state.
 - `ui_dialog`: Current dialog state.
 
+## Entity ID examples
+
+Entity IDs use your configured device name slug. If your integration name is
+`Kaleidescape Strato`, examples include:
+
+- `sensor.kaleidescape_strato_media_location`
+- `sensor.kaleidescape_strato_play_status`
+- `sensor.kaleidescape_strato_play_speed`
+- `sensor.kaleidescape_strato_title_location`
+- `sensor.kaleidescape_strato_title_length`
+- `sensor.kaleidescape_strato_chapter_location`
+- `sensor.kaleidescape_strato_chapter_length`
+- `sensor.kaleidescape_strato_video_mode`
+- `sensor.kaleidescape_strato_video_color_eotf`
+- `sensor.kaleidescape_strato_video_color_space`
+- `sensor.kaleidescape_strato_video_color_depth`
+- `sensor.kaleidescape_strato_video_color_sampling`
+- `sensor.kaleidescape_strato_screen_mask_ratio`
+- `sensor.kaleidescape_strato_screen_mask_top_trim_rel`
+- `sensor.kaleidescape_strato_screen_mask_bottom_trim_rel`
+- `sensor.kaleidescape_strato_screen_mask_conservative_ratio`
+- `sensor.kaleidescape_strato_screen_mask_top_mask_abs`
+- `sensor.kaleidescape_strato_screen_mask_bottom_mask_abs`
+- `sensor.kaleidescape_strato_cinemascape_mode`
+- `sensor.kaleidescape_strato_cinemascape_mask`
+- `sensor.kaleidescape_strato_system_readiness_state`
+- `sensor.kaleidescape_strato_power_state`
+- `sensor.kaleidescape_strato_ui_screen`
+- `sensor.kaleidescape_strato_ui_popup`
+- `sensor.kaleidescape_strato_ui_dialog`
+
 ## Notes
 
 - Confirm protocol-level command names and behavior with the Kaleidescape protocol reference.
