@@ -19,8 +19,10 @@ from .const import (
 from .coordinator import KaleidescapeSensorCoordinator
 
 type KaleidescapeConfigEntry = ConfigEntry
+type KaleidescapePlatform = str
 
 _LOGGER = logging.getLogger(__name__)
+DATA_LOADED_PLATFORMS = "loaded_platforms"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> bool:
@@ -57,13 +59,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry)
         DATA_DEVICE_TYPE: device_type,
     }
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    loaded_platforms: list[KaleidescapePlatform] = []
+    for platform in PLATFORMS:
+        try:
+            await hass.config_entries.async_forward_entry_setups(entry, [platform])
+            loaded_platforms.append(platform)
+        except Exception:
+            _LOGGER.exception(
+                "Failed to set up Kaleidescape platform '%s' for entry %s",
+                platform,
+                entry.entry_id,
+            )
+
+    if not loaded_platforms:
+        _LOGGER.error("No Kaleidescape platforms could be set up for entry %s", entry.entry_id)
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        return False
+
+    hass.data[DOMAIN][entry.entry_id][DATA_LOADED_PLATFORMS] = loaded_platforms
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> bool:
-    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    entry_data = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
+    loaded_platforms = entry_data.get(DATA_LOADED_PLATFORMS, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, loaded_platforms)
     if unloaded:
         hass.data[DOMAIN].pop(entry.entry_id, None)
     return unloaded

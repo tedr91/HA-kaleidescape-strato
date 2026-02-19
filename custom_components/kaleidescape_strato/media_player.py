@@ -73,6 +73,10 @@ class KaleidescapeMediaPlayerEntity(
         self._attr_unique_id = f"{entry.entry_id}_media_player"
 
     @property
+    def available(self) -> bool:
+        return True
+
+    @property
     def device_info(self):
         device_type = self.hass.data[DOMAIN][self._entry.entry_id].get(
             DATA_DEVICE_TYPE, "Kaleidescape"
