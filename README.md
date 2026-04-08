@@ -10,13 +10,14 @@ The built-in integration is limited to a narrower command set on the `remote` en
 - command aliases for common Home Assistant remote commands
 - easy extension of supported commands in code
 
-## Features (v0.1)
+## Features (v1.0)
 
 - Config Flow setup (UI)
 - TCP connectivity to a Strato player
 - `remote` entity with `send_command`
 - Playback and diagnostic sensors, including media/playback state, video output, masking, and UI/system telemetry
 - permissive command handling (unknown commands are sent as-is)
+- bundled Kaleidescape brand images for Home Assistant UI integration branding
 
 ## Installation (manual)
 
@@ -160,6 +161,7 @@ entities:
 
 - Confirm protocol-level command names and behavior with the Kaleidescape protocol reference.
 - Network access from Home Assistant to the Strato host/port is required.
+- Local brand assets are included under `custom_components/kaleidescape_strato/brand` and are used automatically by Home Assistant 2026.3+.
 
 ## Release process
 
