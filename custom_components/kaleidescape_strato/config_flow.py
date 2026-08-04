@@ -1,175 +1,148 @@
 from __future__ import annotations
 
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, CONF_TIMEOUT
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.const import CONF_HOST
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.service_info.ssdp import (
-    ATTR_UPNP_FRIENDLY_NAME,
-    ATTR_UPNP_SERIAL,
-    ATTR_UPNP_UDN,
-    SsdpServiceInfo,
-)
+from homeassistant.helpers.service_info.ssdp import ATTR_UPNP_SERIAL, SsdpServiceInfo
 
-from .api import KaleidescapeClient
+from . import KaleidescapeDeviceInfo, UnsupportedError, validate_host
 from .const import (
     CONF_ALLOW_RAW_COMMANDS,
     CONF_DEBUG_COMMANDS,
     DEFAULT_ALLOW_RAW_COMMANDS,
     DEFAULT_DEBUG_COMMANDS,
-    DEFAULT_NAME,
-    DEFAULT_PORT,
-    DEFAULT_TIMEOUT,
+    DEFAULT_HOST,
     DOMAIN,
 )
+from .const import (
+    NAME as KALEIDESCAPE_NAME,
+)
+
+ERROR_CANNOT_CONNECT = "cannot_connect"
+ERROR_UNSUPPORTED = "unsupported"
 
 
 class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Config flow for Kaleidescape Strato integration."""
+
     VERSION = 1
 
-    _discovered_host: str | None = None
-    _discovered_name: str = DEFAULT_NAME
+    discovered_device: KaleidescapeDeviceInfo
 
-    @staticmethod
-    def _discovery_unique_id(discovery_info: SsdpServiceInfo, host: str) -> str:
-        upnp_udn = discovery_info.ssdp_udn or discovery_info.upnp.get(ATTR_UPNP_UDN)
-        if upnp_udn:
-            return f"udn:{str(upnp_udn).strip().lower()}"
-
-        ssdp_usn = discovery_info.ssdp_usn
-        if ssdp_usn:
-            return f"usn:{ssdp_usn.split('::', 1)[0].strip().lower()}"
-
-        serial_number = discovery_info.upnp.get(ATTR_UPNP_SERIAL)
-        if serial_number:
-            return f"serial:{str(serial_number).strip().lower()}"
-
-        return f"host:{host.strip().lower()}"
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        return KaleidescapeStratoOptionsFlow(config_entry)
-
-    async def async_step_user(self, user_input: dict | None = None) -> FlowResult:
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle user initiated device additions."""
         errors: dict[str, str] = {}
+        host = DEFAULT_HOST
 
         if user_input is not None:
-            await self.async_set_unique_id(f"{user_input[CONF_HOST]}:{user_input[CONF_PORT]}")
-            self._abort_if_unique_id_configured()
+            host = user_input[CONF_HOST].strip()
 
-            client = KaleidescapeClient(
-                host=user_input[CONF_HOST],
-                port=user_input[CONF_PORT],
-                timeout=user_input[CONF_TIMEOUT],
-            )
+            try:
+                info = await validate_host(host)
+                if info.server_only:
+                    raise UnsupportedError
+            except ConnectionError:
+                errors["base"] = ERROR_CANNOT_CONNECT
+            except UnsupportedError:
+                errors["base"] = ERROR_UNSUPPORTED
+            else:
+                host = info.host
 
-            if await client.async_can_connect():
+                await self.async_set_unique_id(info.serial, raise_on_progress=False)
+                self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+
                 return self.async_create_entry(
-                    title=user_input[CONF_NAME],
-                    data=user_input,
+                    title=f"{KALEIDESCAPE_NAME} ({info.name})",
+                    data={CONF_HOST: host},
                 )
-
-            errors["base"] = "cannot_connect"
-
-        data_schema = vol.Schema(
-            {
-                vol.Required(CONF_NAME, default=DEFAULT_NAME): str,
-                vol.Required(CONF_HOST): str,
-                vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
-                vol.Required(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-            }
-        )
 
         return self.async_show_form(
             step_id="user",
-            data_schema=data_schema,
+            data_schema=vol.Schema({vol.Required(CONF_HOST, default=host): str}),
             errors=errors,
         )
 
-    async def async_step_ssdp(self, discovery_info: SsdpServiceInfo) -> FlowResult:
-        """Handle SSDP discovery for Kaleidescape devices."""
-        if discovery_info.ssdp_location is None:
-            return self.async_abort(reason="cannot_connect")
+    async def async_step_ssdp(
+        self, discovery_info: SsdpServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle discovered device."""
+        host = cast(str, urlparse(discovery_info.ssdp_location).hostname)
+        serial_number = discovery_info.upnp[ATTR_UPNP_SERIAL]
 
-        discovered_host = urlparse(discovery_info.ssdp_location).hostname
-        if discovered_host is None:
-            return self.async_abort(reason="cannot_connect")
+        await self.async_set_unique_id(serial_number)
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
 
-        for entry in self._async_current_entries():
-            if entry.data.get(CONF_HOST) == discovered_host:
-                return self.async_abort(reason="already_configured")
+        try:
+            self.discovered_device = await validate_host(host)
+            if self.discovered_device.server_only:
+                raise UnsupportedError
+        except ConnectionError:
+            return self.async_abort(reason=ERROR_CANNOT_CONNECT)
+        except UnsupportedError:
+            return self.async_abort(reason=ERROR_UNSUPPORTED)
 
-        await self.async_set_unique_id(
-            self._discovery_unique_id(discovery_info, discovered_host),
+        self.context.update(
+            {
+                "title_placeholders": {
+                    "name": self.discovered_device.name,
+                    "model": self.discovered_device.model,
+                }
+            }
         )
-        self._abort_if_unique_id_configured(updates={CONF_HOST: discovered_host})
 
-        client = KaleidescapeClient(
-            host=discovered_host,
-            port=DEFAULT_PORT,
-            timeout=DEFAULT_TIMEOUT,
-        )
-        if not await client.async_can_connect():
-            return self.async_abort(reason="cannot_connect")
-
-        self._discovered_host = discovered_host
-        self._discovered_name = str(
-            discovery_info.upnp.get(ATTR_UPNP_FRIENDLY_NAME, DEFAULT_NAME)
-        )
-        self.context.update({"title_placeholders": {"name": self._discovered_name}})
         return await self.async_step_discovery_confirm()
 
     async def async_step_discovery_confirm(
         self, user_input: dict | None = None
-    ) -> FlowResult:
-        """Confirm setup of a discovered Kaleidescape device."""
-        if self._discovered_host is None:
-            return self.async_abort(reason="cannot_connect")
-
+    ) -> ConfigFlowResult:
+        """Handle addition of discovered device."""
         if user_input is None:
             return self.async_show_form(
                 step_id="discovery_confirm",
-                description_placeholders={"name": self._discovered_name},
+                description_placeholders={
+                    "name": self.discovered_device.name,
+                    "model": self.discovered_device.model,
+                },
                 errors={},
             )
 
         return self.async_create_entry(
-            title=self._discovered_name,
-            data={
-                CONF_NAME: self._discovered_name,
-                CONF_HOST: self._discovered_host,
-                CONF_PORT: DEFAULT_PORT,
-                CONF_TIMEOUT: DEFAULT_TIMEOUT,
-            },
+            title=f"{KALEIDESCAPE_NAME} ({self.discovered_device.name})",
+            data={CONF_HOST: self.discovered_device.host},
         )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry) -> OptionsFlow:
+        """Return the options flow."""
+        return KaleidescapeStratoOptionsFlow()
 
 
 class KaleidescapeStratoOptionsFlow(OptionsFlow):
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        self._config_entry = config_entry
+    """Options flow for Kaleidescape Strato."""
 
-    async def async_step_init(self, user_input: dict | None = None) -> FlowResult:
+    async def async_step_init(self, user_input: dict | None = None) -> ConfigFlowResult:
+        """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
+        options = self.config_entry.options
         data_schema = vol.Schema(
             {
                 vol.Required(
                     CONF_DEBUG_COMMANDS,
-                    default=self._config_entry.options.get(
-                        CONF_DEBUG_COMMANDS,
-                        DEFAULT_DEBUG_COMMANDS,
-                    ),
+                    default=options.get(CONF_DEBUG_COMMANDS, DEFAULT_DEBUG_COMMANDS),
                 ): bool,
                 vol.Required(
                     CONF_ALLOW_RAW_COMMANDS,
-                    default=self._config_entry.options.get(
-                        CONF_ALLOW_RAW_COMMANDS,
-                        DEFAULT_ALLOW_RAW_COMMANDS,
+                    default=options.get(
+                        CONF_ALLOW_RAW_COMMANDS, DEFAULT_ALLOW_RAW_COMMANDS
                     ),
                 ): bool,
             }

@@ -7,201 +7,123 @@ from homeassistant.components.media_player import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.dt import utcnow
+from kaleidescape import const as kaleidescape_const
 
-from .const import DATA_DEVICE_TYPE, DATA_IS_MOVIE_PLAYER, DEFAULT_NAME, DOMAIN
-from .coordinator import KaleidescapeSensorCoordinator
+from . import KaleidescapeConfigEntry
+from .entity import KaleidescapeEntity
 
-POWER_ON_COMMAND = "LEAVE_STANDBY"
-POWER_OFF_COMMAND = "ENTER_STANDBY"
-
-PLAYING_STATES = {"playing", "forward", "reverse"}
-
-
-def _supported_features() -> MediaPlayerEntityFeature:
-    features = MediaPlayerEntityFeature(0)
-    for feature_name in (
-        "TURN_ON",
-        "TURN_OFF",
-        "PLAY",
-        "PAUSE",
-        "STOP",
-        "NEXT_TRACK",
-        "PREVIOUS_TRACK",
-    ):
-        feature_value = getattr(MediaPlayerEntityFeature, feature_name, None)
-        if feature_value is not None:
-            features |= feature_value
-    return features
+KALEIDESCAPE_PLAYING_STATES = [
+    kaleidescape_const.PLAY_STATUS_PLAYING,
+    kaleidescape_const.PLAY_STATUS_FORWARD,
+    kaleidescape_const.PLAY_STATUS_REVERSE,
+]
+KALEIDESCAPE_PAUSED_STATES = [kaleidescape_const.PLAY_STATUS_PAUSED]
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: KaleidescapeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    if not hass.data[DOMAIN][entry.entry_id][DATA_IS_MOVIE_PLAYER]:
-        return
-
-    client = hass.data[DOMAIN][entry.entry_id]["client"]
-    coordinator: KaleidescapeSensorCoordinator = hass.data[DOMAIN][entry.entry_id][
-        "sensor_coordinator"
-    ]
-    async_add_entities([KaleidescapeMediaPlayerEntity(entry, client, coordinator)])
+    """Set up the platform from a config entry."""
+    async_add_entities([KaleidescapeMediaPlayer(entry.runtime_data.device)])
 
 
-class KaleidescapeMediaPlayerEntity(
-    CoordinatorEntity[KaleidescapeSensorCoordinator], MediaPlayerEntity
-):
-    _attr_has_entity_name = True
+class KaleidescapeMediaPlayer(KaleidescapeEntity, MediaPlayerEntity):
+    """Representation of a Kaleidescape device."""
+
     _attr_name = None
-    _attr_supported_features = _supported_features()
+    _attr_media_image_remotely_accessible = True
+    _attr_supported_features = (
+        MediaPlayerEntityFeature.TURN_ON
+        | MediaPlayerEntityFeature.TURN_OFF
+        | MediaPlayerEntityFeature.PLAY
+        | MediaPlayerEntityFeature.PAUSE
+        | MediaPlayerEntityFeature.STOP
+        | MediaPlayerEntityFeature.NEXT_TRACK
+        | MediaPlayerEntityFeature.PREVIOUS_TRACK
+    )
 
-    def __init__(
-        self,
-        entry: ConfigEntry,
-        client,
-        coordinator: KaleidescapeSensorCoordinator,
-    ) -> None:
-        super().__init__(coordinator)
-        self._entry = entry
-        self._client = client
-        self._attr_unique_id = f"{entry.entry_id}_media_player"
+    async def async_turn_on(self) -> None:
+        """Send leave standby command."""
+        await self._device.leave_standby()
 
-    @property
-    def available(self) -> bool:
-        return True
+    async def async_turn_off(self) -> None:
+        """Send enter standby command."""
+        await self._device.enter_standby()
 
-    @property
-    def device_info(self):
-        device_type = self.hass.data[DOMAIN][self._entry.entry_id].get(
-            DATA_DEVICE_TYPE, "Kaleidescape"
-        )
-        return {
-            "identifiers": {(DOMAIN, self._entry.entry_id)},
-            "manufacturer": "Kaleidescape",
-            "model": str(device_type),
-            "name": self._entry.data.get(CONF_NAME, DEFAULT_NAME),
-        }
+    async def async_media_pause(self) -> None:
+        """Send pause command."""
+        await self._device.pause()
+
+    async def async_media_play(self) -> None:
+        """Send play command."""
+        await self._device.play()
+
+    async def async_media_stop(self) -> None:
+        """Send stop command."""
+        await self._device.stop()
+
+    async def async_media_next_track(self) -> None:
+        """Send track next command."""
+        await self._device.next()
+
+    async def async_media_previous_track(self) -> None:
+        """Send track previous command."""
+        await self._device.previous()
 
     @property
     def state(self) -> MediaPlayerState:
-        if not self.coordinator.data:
+        """State of device."""
+        if self._device.power.state == kaleidescape_const.DEVICE_POWER_STATE_STANDBY:
             return MediaPlayerState.OFF
-
-        power_state = str(self.coordinator.data.get("power_state") or "standby")
-        if power_state == "standby":
-            return MediaPlayerState.OFF
-
-        play_status = str(self.coordinator.data.get("play_status") or "none")
-        if play_status in PLAYING_STATES:
+        if self._device.movie.play_status in KALEIDESCAPE_PLAYING_STATES:
             return MediaPlayerState.PLAYING
-        if play_status == "paused":
+        if self._device.movie.play_status in KALEIDESCAPE_PAUSED_STATES:
             return MediaPlayerState.PAUSED
         return MediaPlayerState.IDLE
 
     @property
-    def media_position(self) -> int | None:
-        if not self.coordinator.data:
-            return None
-        location = self.coordinator.data.get("title_location")
-        if isinstance(location, (int, float)):
-            return int(location)
-        return None
-
-    @property
-    def media_duration(self) -> int | None:
-        if not self.coordinator.data:
-            return None
-        duration = self.coordinator.data.get("title_length")
-        if isinstance(duration, (int, float)):
-            return int(duration)
-        return None
-
-    @property
-    def media_title(self) -> str | None:
-        if not self.coordinator.data:
-            return None
-        title = self.coordinator.data.get("media_title")
-        if isinstance(title, str) and title.strip():
-            return title
-        return None
+    def available(self) -> bool:
+        """Return if device is available."""
+        return self._device.is_connected
 
     @property
     def media_content_id(self) -> str | None:
-        if not self.coordinator.data:
-            return None
-        content_id = self.coordinator.data.get("media_content_id")
-        if isinstance(content_id, str) and content_id.strip():
-            return content_id
-        return None
+        """Content ID of current playing media."""
+        return self._device.movie.handle or None
 
     @property
     def media_content_type(self) -> str | None:
-        if not self.coordinator.data:
-            return None
-        content_type = self.coordinator.data.get("media_content_type")
-        if isinstance(content_type, str) and content_type.strip() and content_type != "none":
-            return content_type
+        """Content type of current playing media."""
+        return self._device.movie.media_type
+
+    @property
+    def media_duration(self) -> int | None:
+        """Duration of current playing media in seconds."""
+        return self._device.movie.title_length or None
+
+    @property
+    def media_position(self) -> int | None:
+        """Position of current playing media in seconds."""
+        return self._device.movie.title_location or None
+
+    @property
+    def media_position_updated_at(self) -> datetime | None:
+        """When was the position of the current playing media valid."""
+        if self._device.movie.play_status in KALEIDESCAPE_PLAYING_STATES:
+            return utcnow()
         return None
 
     @property
     def media_image_url(self) -> str | None:
-        if not self.coordinator.data:
-            return None
-        image_url = self.coordinator.data.get("media_image_url")
-        if isinstance(image_url, str) and image_url.strip():
-            return image_url
-        return None
+        """Image url of current playing media."""
+        return self._device.movie.cover or None
 
     @property
-    def media_image_remotely_accessible(self) -> bool:
-        return True
-
-    @property
-    def media_position_updated_at(self) -> datetime | None:
-        if self.state == MediaPlayerState.PLAYING:
-            return utcnow()
-        return None
-
-    async def async_turn_on(self) -> None:
-        await self._client.async_send_command(POWER_ON_COMMAND)
-        await self.coordinator.async_request_refresh()
-
-    async def async_turn_off(self) -> None:
-        await self._client.async_send_command(POWER_OFF_COMMAND)
-        await self.coordinator.async_request_refresh()
-
-    async def async_media_play(self) -> None:
-        await self._client.async_send_command("PLAY")
-        await self.coordinator.async_request_refresh()
-
-    async def async_media_pause(self) -> None:
-        await self._client.async_send_command("PAUSE")
-        await self.coordinator.async_request_refresh()
-
-    async def async_media_stop(self) -> None:
-        await self._client.async_send_command("STOP_OR_CANCEL")
-        await self.coordinator.async_request_refresh()
-
-    async def async_media_next_track(self) -> None:
-        await self._client.async_send_command("NEXT")
-        await self.coordinator.async_request_refresh()
-
-    async def async_media_previous_track(self) -> None:
-        await self._client.async_send_command("PREVIOUS")
-        await self.coordinator.async_request_refresh()
-
-    async def async_toggle(self) -> None:
-        if self.state == MediaPlayerState.PLAYING:
-            await self.async_media_pause()
-            return
-        await self.async_media_play()
-
-    async def async_update(self) -> None:
-        await self.coordinator.async_request_refresh()
+    def media_title(self) -> str | None:
+        """Title of current playing media."""
+        return self._device.movie.title or None

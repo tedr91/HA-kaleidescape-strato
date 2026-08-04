@@ -4,119 +4,92 @@ import asyncio
 from collections.abc import Iterable
 from typing import Any
 
-from homeassistant.components.remote import RemoteEntity, RemoteEntityFeature
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_NAME
+from homeassistant.components.remote import RemoteEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from kaleidescape import const as kaleidescape_const
 
-from .const import (
-    COMMAND_ALIASES,
-    CONF_ALLOW_RAW_COMMANDS,
-    DEFAULT_ALLOW_RAW_COMMANDS,
-    DEFAULT_NAME,
-    DOMAIN,
-)
-
-POWER_ON_COMMAND = "LEAVE_STANDBY"
-POWER_OFF_COMMAND = "ENTER_STANDBY"
-
-
-def _supported_features() -> RemoteEntityFeature:
-    features = RemoteEntityFeature(0)
-    for feature_name in ("SEND_COMMAND", "TURN_ON", "TURN_OFF", "TOGGLE"):
-        feature_value = getattr(RemoteEntityFeature, feature_name, None)
-        if feature_value is not None:
-            features |= feature_value
-    return features
-
-
-def _normalize_command(command: str, *, allow_raw_commands: bool) -> str:
-    lowered = command.strip().lower()
-    if lowered in COMMAND_ALIASES:
-        return COMMAND_ALIASES[lowered]
-
-    if allow_raw_commands:
-        return command.strip()
-
-    raise HomeAssistantError(
-        "Raw commands are disabled. Enable 'Allow sending raw commands to device' "
-        "in options to use passthrough commands."
-    )
+from . import KaleidescapeConfigEntry
+from .api import KaleidescapeRawClient
+from .const import ALIAS_TO_METHOD, COMMAND_ALIASES
+from .entity import KaleidescapeEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: KaleidescapeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    client = hass.data[DOMAIN][entry.entry_id]["client"]
-    async_add_entities([KaleidescapeRemoteEntity(entry, client)])
+    """Set up the platform from a config entry."""
+    data = entry.runtime_data
+    async_add_entities(
+        [KaleidescapeRemote(data.device, data.raw_client, data.allow_raw_commands)]
+    )
 
 
-class KaleidescapeRemoteEntity(RemoteEntity):
-    _attr_has_entity_name = True
+class KaleidescapeRemote(KaleidescapeEntity, RemoteEntity):
+    """Representation of a Kaleidescape device."""
+
     _attr_name = None
-    _attr_should_poll = False
-    _attr_supported_features = _supported_features()
 
-    def __init__(self, entry: ConfigEntry, client) -> None:
-        self._entry = entry
-        self._client = client
-        self._allow_raw_commands = entry.options.get(
-            CONF_ALLOW_RAW_COMMANDS,
-            DEFAULT_ALLOW_RAW_COMMANDS,
-        )
-        self._attr_unique_id = f"{entry.entry_id}_remote"
-        self._attr_is_on = True
-
-    @property
-    def available(self) -> bool:
-        return True
+    def __init__(
+        self,
+        device,
+        raw_client: KaleidescapeRawClient,
+        allow_raw_commands: bool,
+    ) -> None:
+        super().__init__(device)
+        self._raw_client = raw_client
+        self._allow_raw_commands = allow_raw_commands
 
     @property
     def is_on(self) -> bool:
-        return bool(self._attr_is_on)
+        """Return true if device is on."""
+        return self._device.power.state == kaleidescape_const.DEVICE_POWER_STATE_ON
 
-    @property
-    def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, self._entry.entry_id)},
-            "manufacturer": "Kaleidescape",
-            "model": "Strato",
-            "name": self._entry.data.get(CONF_NAME, DEFAULT_NAME),
-        }
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the device on."""
+        await self._device.leave_standby()
 
-    async def async_send_command(self, command: Iterable[str] | str, **kwargs: Any) -> None:
-        commands = [command] if isinstance(command, str) else list(command)
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the device off."""
+        await self._device.enter_standby()
 
+    async def async_send_command(self, command: Iterable[str], **kwargs: Any) -> None:
+        """Send a command to the device."""
+        commands = list(command)
         num_repeats = int(kwargs.get("num_repeats", 1))
         delay_secs = float(kwargs.get("delay_secs", 0.4))
 
         for repeat_index in range(num_repeats):
-            for command_index, raw_command in enumerate(commands):
-                resolved = _normalize_command(
-                    raw_command,
-                    allow_raw_commands=self._allow_raw_commands,
-                )
-                await self._client.async_send_command(resolved)
+            for command_index, cmd in enumerate(commands):
+                await self._async_send_single(cmd)
 
                 last_command = command_index == len(commands) - 1
                 last_repeat = repeat_index == num_repeats - 1
                 if not (last_command and last_repeat):
                     await asyncio.sleep(delay_secs)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        await self._client.async_send_command(POWER_ON_COMMAND)
-        self._attr_is_on = True
+    async def _async_send_single(self, cmd: str) -> None:
+        """Resolve and send a single command."""
+        key = cmd.strip().lower()
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        await self._client.async_send_command(POWER_OFF_COMMAND)
-        self._attr_is_on = False
-
-    async def async_toggle(self, **kwargs: Any) -> None:
-        if self._attr_is_on:
-            await self.async_turn_off(**kwargs)
+        method_name = ALIAS_TO_METHOD.get(key)
+        if method_name is not None:
+            await getattr(self._device, method_name)()
             return
-        await self.async_turn_on(**kwargs)
+
+        wire_command = COMMAND_ALIASES.get(key)
+        if wire_command is not None:
+            await self._raw_client.async_send_command(wire_command)
+            return
+
+        if self._allow_raw_commands:
+            await self._raw_client.async_send_command(cmd.strip())
+            return
+
+        raise HomeAssistantError(
+            f"{cmd} is not a known command. Enable 'Allow sending raw commands to "
+            "device' in options to send passthrough commands."
+        )

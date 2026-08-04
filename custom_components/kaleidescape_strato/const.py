@@ -3,18 +3,53 @@ from __future__ import annotations
 from homeassistant.const import Platform
 
 DOMAIN = "kaleidescape_strato"
-DEFAULT_NAME = "Kaleidescape"
+NAME = "Kaleidescape"
+DEFAULT_HOST = ""
 DEFAULT_PORT = 10000
 DEFAULT_TIMEOUT = 5.0
-SENSOR_SCAN_INTERVAL = 5
+
 CONF_DEBUG_COMMANDS = "debug_commands"
 DEFAULT_DEBUG_COMMANDS = False
 CONF_ALLOW_RAW_COMMANDS = "allow_raw_commands"
 DEFAULT_ALLOW_RAW_COMMANDS = False
-DATA_IS_MOVIE_PLAYER = "is_movie_player"
-DATA_DEVICE_TYPE = "device_type"
-PLATFORMS: list[Platform] = [Platform.REMOTE, Platform.SENSOR, Platform.MEDIA_PLAYER]
 
+PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER, Platform.REMOTE, Platform.SENSOR]
+
+# Aliases that map directly to a pykaleidescape Device method.
+ALIAS_TO_METHOD: dict[str, str] = {
+    "up": "up",
+    "down": "down",
+    "left": "left",
+    "right": "right",
+    "select": "select",
+    "ok": "select",
+    "enter": "select",
+    "cancel": "cancel",
+    "play": "play",
+    "pause": "pause",
+    "stop": "stop",
+    "next": "next",
+    "previous": "previous",
+    "rewind": "scan_reverse",
+    "fast_forward": "scan_forward",
+    "replay": "replay",
+    "power_on": "leave_standby",
+    "turn_on": "leave_standby",
+    "on": "leave_standby",
+    "power_off": "enter_standby",
+    "turn_off": "enter_standby",
+    "off": "enter_standby",
+    "intermission_toggle": "intermission_toggle",
+    "intermission": "intermission_toggle",
+    "movie_list": "go_movie_list",
+    "movie_collections": "go_movie_collections",
+    "movies": "go_movie_collections",
+    "movie_covers": "go_movie_covers",
+    "kaleidescape_menu_toggle": "menu_toggle",
+}
+
+# Curated aliases whose wire command pykaleidescape does not wrap; sent via the
+# raw client. These are always allowed regardless of the raw-commands option.
 COMMAND_ALIASES: dict[str, str] = {
     "up": "UP",
     "down": "DOWN",

@@ -2,25 +2,25 @@
   "config": {
     "step": {
       "user": {
-        "title": "Kaleidescape Strato/Terra",
-        "description": "Connect to a Kaleidescape Strato player or Terra server",
+        "title": "Kaleidescape Strato",
+        "description": "Enter the host or IP address of your Kaleidescape Strato player.",
         "data": {
-          "name": "Name",
-          "host": "Host",
-          "port": "Port",
-          "timeout": "Timeout (seconds)"
+          "host": "Host"
         }
       },
       "discovery_confirm": {
-        "title": "Kaleidescape Strato/Terra",
-        "description": "Discovered {name}. Confirm setup to add this device."
+        "title": "Kaleidescape Strato",
+        "description": "Do you want to set up {name} ({model})?"
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to the Kaleidescape device"
+      "cannot_connect": "Failed to connect to the Kaleidescape device",
+      "unsupported": "This Kaleidescape device type is not supported"
     },
     "abort": {
-      "already_configured": "This Kaleidescape device is already configured"
+      "already_configured": "This Kaleidescape device is already configured",
+      "cannot_connect": "Failed to connect to the Kaleidescape device",
+      "unsupported": "This Kaleidescape device type is not supported"
     }
   },
   "options": {
@@ -32,6 +32,38 @@
           "allow_raw_commands": "Allow sending raw commands to device"
         }
       }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "serial": { "name": "Serial number" },
+      "cpdid": { "name": "CPDID" },
+      "device_ip": { "name": "Device IP" },
+      "system_readiness_state": { "name": "System readiness" },
+      "power_state": { "name": "Power state" },
+      "media_location": { "name": "Media location" },
+      "play_status": { "name": "Play status" },
+      "play_speed": { "name": "Play speed" },
+      "video_mode": { "name": "Video mode" },
+      "video_color_eotf": { "name": "Video color EOTF" },
+      "video_color_space": { "name": "Video color space" },
+      "video_color_depth": { "name": "Video color depth" },
+      "video_color_sampling": { "name": "Video color sampling" },
+      "screen_mask_ratio": { "name": "Screen mask ratio" },
+      "screen_mask_top_trim_rel": { "name": "Screen mask top trim" },
+      "screen_mask_bottom_trim_rel": { "name": "Screen mask bottom trim" },
+      "screen_mask_conservative_ratio": { "name": "Screen mask conservative ratio" },
+      "screen_mask_top_mask_abs": { "name": "Screen mask top" },
+      "screen_mask_bottom_mask_abs": { "name": "Screen mask bottom" },
+      "cinemascape_mode": { "name": "CinemaScape mode" },
+      "cinemascape_mask": { "name": "CinemaScape mask" },
+      "ui_screen": { "name": "UI screen" },
+      "ui_popup": { "name": "UI popup" },
+      "ui_dialog": { "name": "UI dialog" },
+      "title_location": { "name": "Title location" },
+      "title_length": { "name": "Title length" },
+      "chapter_location": { "name": "Chapter location" },
+      "chapter_length": { "name": "Chapter length" }
     }
   }
 }

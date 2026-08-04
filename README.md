@@ -1,23 +1,38 @@
 # Kaleidescape Strato (Custom Home Assistant Integration)
 
-Custom Home Assistant integration that exposes a `remote` entity for Kaleidescape Strato players with a more permissive command model than the built-in integration.
+Custom Home Assistant integration for Kaleidescape Strato movie players. It builds on
+the official [`pykaleidescape`](https://github.com/SteveEasley/pykaleidescape) library
+(the same one the built-in `kaleidescape` integration uses) and adds a richer `remote`
+entity, extra diagnostic sensors, and an options flow.
 
 ## Why this exists
 
-The built-in integration is limited to a narrower command set on the `remote` entity. This custom integration allows:
+The built-in integration limits the `remote` entity to a small, fixed command set and
+exposes fewer sensors. This custom integration adds:
 
-- direct pass-through of protocol commands
-- command aliases for common Home Assistant remote commands
-- easy extension of supported commands in code
+- a `remote` entity with a large command-alias set that maps to native player commands
+- curated pass-through of protocol commands the library does not wrap
+- optional raw command pass-through for arbitrary protocol commands
+- additional diagnostic sensors (UI state, title/chapter position, device identity, etc.)
+- an options flow for command debug logging and enabling raw commands
 
-## Features (v1.0)
+## Architecture
 
-- Config Flow setup (UI)
-- TCP connectivity to a Strato player
-- `remote` entity with `send_command`
-- Playback and diagnostic sensors, including media/playback state, video output, masking, and UI/system telemetry
-- permissive command handling (unknown commands are sent as-is)
-- bundled Kaleidescape brand images for Home Assistant UI integration branding
+- **Transport:** `pykaleidescape` over the local network (`local_push`). State updates
+  arrive via the library's event dispatcher — there is no polling.
+- **Raw sender:** a thin, fire-and-forget TCP client is used only for commands that
+  `pykaleidescape` does not expose natively (and for raw pass-through when enabled).
+- **Scope:** Strato movie players only. Server-only devices (for example Terra) are
+  rejected during setup.
+
+## Features
+
+- Config flow setup (UI) and SSDP discovery
+- `media_player` entity (power, transport, media metadata, cover art)
+- `remote` entity with `send_command`, aliases, and optional raw pass-through
+- Playback and diagnostic sensors (media/playback state, video output, masking, UI/system telemetry)
+- Options flow: command debug logging and "allow raw commands"
+- Bundled Kaleidescape brand images for Home Assistant UI branding
 
 ## Installation (manual)
 
@@ -25,7 +40,9 @@ The built-in integration is limited to a narrower command set on the `remote` en
 2. Restart Home Assistant.
 3. Go to **Settings → Devices & Services → Add Integration**.
 4. Search for **Kaleidescape Strato**.
-5. Enter host/port for your player.
+5. Enter the **host** (IP address or hostname) of your Strato player.
+
+Home Assistant will install the `pykaleidescape` dependency automatically.
 
 ## Installation (HACS)
 
@@ -35,50 +52,84 @@ The built-in integration is limited to a narrower command set on the `remote` en
 4. Find **Kaleidescape Strato** in HACS and install it.
 5. Restart Home Assistant and add the integration from **Settings → Devices & Services**.
 
+## Options
+
+Open **Settings → Devices & Services → Kaleidescape Strato → Configure**:
+
+- **Enable command debug logging** — logs raw commands sent through the raw client.
+- **Allow sending raw commands to device** — permits arbitrary, unrecognized commands to
+  be sent as-is via `remote.send_command`. When disabled, unknown commands raise an error.
+
 ## Using commands
 
-You can call Home Assistant service `remote.send_command` against this entity.
+Call the `remote.send_command` service against the remote entity.
 
-Example (pass-through raw protocol command):
-
-```yaml
-service: remote.send_command
-target:
-  entity_id: remote.kaleidescape_strato
-metadata: {}
-data:
-  command: "PLAY"
-```
-
-Example (Home Assistant-style alias):
+Home Assistant-style alias (mapped to a native player command):
 
 ```yaml
 service: remote.send_command
 target:
   entity_id: remote.kaleidescape_strato
-metadata: {}
 data:
   command: "up"
 ```
 
-`up` maps to `UP`, while unknown values are sent unchanged.
+Curated protocol command (sent via the raw client even without enabling raw commands):
 
-## Exposed sensors
+```yaml
+service: remote.send_command
+target:
+  entity_id: remote.kaleidescape_strato
+data:
+  command: "SHOW_NAVIGATION_OVERLAY"
+```
 
-### Core playback sensors
+Arbitrary raw command (requires **Allow sending raw commands** enabled in options):
+
+```yaml
+service: remote.send_command
+target:
+  entity_id: remote.kaleidescape_strato
+data:
+  command: "01/0/GET_DEVICE_INFO:"
+```
+
+Command resolution order for each value:
+
+1. If it matches a known alias, the matching native `pykaleidescape` method is called.
+2. Otherwise, if it matches a curated alias, its protocol command is sent via the raw client.
+3. Otherwise, if raw commands are enabled, the value is sent as-is.
+4. Otherwise, an error is raised.
+
+`num_repeats` and `delay_secs` are honored.
+
+## Entities
+
+### Media player
+
+- `media_player.kaleidescape_strato` — power (turn on/off), transport (play/pause/stop/next/previous),
+  and media metadata (title, cover art, position/duration, content id/type).
+
+### Remote
+
+- `remote.kaleidescape_strato` — `send_command`, plus turn on/off (leave/enter standby).
+
+### Sensors
+
+#### Core playback sensors
 
 - `media_location`: Where playback is in the title (for example `content`, `credits`, `disc_menu`).
 - `play_status`: Current transport mode (for example `playing`, `paused`, `forward`, `reverse`).
 - `play_speed`: Current transport speed value reported by the player.
 
-### Playback telemetry sensors
+#### Playback telemetry sensors
 
 - `title_location`: Current position within the title.
 - `title_length`: Total title length.
 - `chapter_location`: Current position within the chapter.
 - `chapter_length`: Total chapter length.
 
-### Video diagnostics
+#### Video diagnostics
 
 - `video_mode`: Current output video mode/resolution profile.
 - `video_color_eotf`: Active transfer function (for example SDR/HDR).
@@ -86,7 +137,7 @@ data:
 - `video_color_depth`: Active color depth.
 - `video_color_sampling`: Active chroma sampling mode.
 
-### Masking and Cinemascape diagnostics
+#### Masking and CinemaScape diagnostics
 
 - `screen_mask_ratio`: Reported content aspect ratio for masking.
 - `screen_mask_top_trim_rel`: Top trim percentage.
@@ -94,47 +145,19 @@ data:
 - `screen_mask_conservative_ratio`: Conservative mask ratio recommendation.
 - `screen_mask_top_mask_abs`: Absolute top mask percentage.
 - `screen_mask_bottom_mask_abs`: Absolute bottom mask percentage.
-- `cinemascape_mode`: Current Cinemascape mode.
-- `cinemascape_mask`: Current Cinemascape mask value.
+- `cinemascape_mode`: Current CinemaScape mode.
+- `cinemascape_mask`: Current CinemaScape mask value.
 
-### System and UI diagnostics
+#### System and UI diagnostics
 
+- `serial`: Player serial number.
+- `cpdid`: Player CPDID.
+- `device_ip`: Player IP address.
 - `system_readiness_state`: Player readiness state.
 - `power_state`: Reported power state.
 - `ui_screen`: Current on-screen UI screen.
 - `ui_popup`: Current popup state.
 - `ui_dialog`: Current dialog state.
-
-## Entity ID examples
-
-Entity IDs use your configured device name slug. If your integration name is
-`Kaleidescape Strato`, examples include:
-
-- `sensor.kaleidescape_strato_media_location`
-- `sensor.kaleidescape_strato_play_status`
-- `sensor.kaleidescape_strato_play_speed`
-- `sensor.kaleidescape_strato_title_location`
-- `sensor.kaleidescape_strato_title_length`
-- `sensor.kaleidescape_strato_chapter_location`
-- `sensor.kaleidescape_strato_chapter_length`
-- `sensor.kaleidescape_strato_video_mode`
-- `sensor.kaleidescape_strato_video_color_eotf`
-- `sensor.kaleidescape_strato_video_color_space`
-- `sensor.kaleidescape_strato_video_color_depth`
-- `sensor.kaleidescape_strato_video_color_sampling`
-- `sensor.kaleidescape_strato_screen_mask_ratio`
-- `sensor.kaleidescape_strato_screen_mask_top_trim_rel`
-- `sensor.kaleidescape_strato_screen_mask_bottom_trim_rel`
-- `sensor.kaleidescape_strato_screen_mask_conservative_ratio`
-- `sensor.kaleidescape_strato_screen_mask_top_mask_abs`
-- `sensor.kaleidescape_strato_screen_mask_bottom_mask_abs`
-- `sensor.kaleidescape_strato_cinemascape_mode`
-- `sensor.kaleidescape_strato_cinemascape_mask`
-- `sensor.kaleidescape_strato_system_readiness_state`
-- `sensor.kaleidescape_strato_power_state`
-- `sensor.kaleidescape_strato_ui_screen`
-- `sensor.kaleidescape_strato_ui_popup`
-- `sensor.kaleidescape_strato_ui_dialog`
 
 ## Lovelace example card
 
@@ -143,12 +166,12 @@ type: entities
 title: Kaleidescape Strato
 show_header_toggle: false
 entities:
+  - entity: media_player.kaleidescape_strato
+    name: Player
   - entity: remote.kaleidescape_strato
     name: Remote
   - entity: sensor.kaleidescape_strato_play_status
     name: Play status
-  - entity: sensor.kaleidescape_strato_play_speed
-    name: Play speed
   - entity: sensor.kaleidescape_strato_media_location
     name: Media location
   - entity: sensor.kaleidescape_strato_video_mode
@@ -159,8 +182,8 @@ entities:
 
 ## Notes
 
-- Confirm protocol-level command names and behavior with the Kaleidescape protocol reference.
-- Network access from Home Assistant to the Strato host/port is required.
+- Only Strato movie players are supported; server-only devices are rejected at setup.
+- Network access from Home Assistant to the Strato host (TCP port 10000) is required.
 - Local brand assets are included under `custom_components/kaleidescape_strato/brand` and are used automatically by Home Assistant 2026.3+.
 
 ## Release process

@@ -4,248 +4,223 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_NAME, PERCENTAGE, EntityCategory
+from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from kaleidescape import Device as KaleidescapeDevice
 
-from .const import DATA_DEVICE_TYPE, DATA_IS_MOVIE_PLAYER, DEFAULT_NAME, DOMAIN
-from .coordinator import KaleidescapeSensorCoordinator
+from . import KaleidescapeConfigEntry
+from .entity import KaleidescapeEntity
 
 
 @dataclass(frozen=True, kw_only=True)
-class KaleidescapeSensorDescription(SensorEntityDescription):
-    value_fn: Callable[[dict[str, str | int | float | None]], StateType]
+class KaleidescapeSensorEntityDescription(SensorEntityDescription):
+    """Describes Kaleidescape sensor entity."""
+
+    value_fn: Callable[[KaleidescapeDevice], StateType]
 
 
-SHARED_SENSOR_TYPES: tuple[KaleidescapeSensorDescription, ...] = (
-    KaleidescapeSensorDescription(
+SENSOR_TYPES: tuple[KaleidescapeSensorEntityDescription, ...] = (
+    KaleidescapeSensorEntityDescription(
         key="serial",
-        name="Serial",
+        translation_key="serial",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("serial"),
+        value_fn=lambda device: device.system.serial_number,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="cpdid",
-        name="Cpdid",
+        translation_key="cpdid",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("cpdid"),
+        value_fn=lambda device: device.system.cpdid,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="device_ip",
-        name="Device ip",
+        translation_key="device_ip",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("device_ip"),
+        value_fn=lambda device: device.system.ip_address,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="system_readiness_state",
-        name="System readiness state",
+        translation_key="system_readiness_state",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("system_readiness_state"),
+        value_fn=lambda device: device.power.readiness,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="power_state",
-        name="Power state",
+        translation_key="power_state",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("power_state"),
+        value_fn=lambda device: device.power.state,
     ),
-)
-
-
-PLAYER_SENSOR_TYPES: tuple[KaleidescapeSensorDescription, ...] = (
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="media_location",
-        name="Media location",
-        value_fn=lambda state: state.get("media_location"),
+        translation_key="media_location",
+        value_fn=lambda device: device.automation.movie_location,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="play_status",
-        name="Play status",
-        value_fn=lambda state: state.get("play_status"),
+        translation_key="play_status",
+        value_fn=lambda device: device.movie.play_status,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="play_speed",
-        name="Play speed",
-        value_fn=lambda state: state.get("play_speed"),
+        translation_key="play_speed",
+        value_fn=lambda device: device.movie.play_speed,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="video_mode",
-        name="Video mode",
+        translation_key="video_mode",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("video_mode"),
+        value_fn=lambda device: device.automation.video_mode,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="video_color_eotf",
-        name="Video color eotf",
+        translation_key="video_color_eotf",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("video_color_eotf"),
+        value_fn=lambda device: device.automation.video_color_eotf,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="video_color_space",
-        name="Video color space",
+        translation_key="video_color_space",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("video_color_space"),
+        value_fn=lambda device: device.automation.video_color_space,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="video_color_depth",
-        name="Video color depth",
+        translation_key="video_color_depth",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("video_color_depth"),
+        value_fn=lambda device: device.automation.video_color_depth,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="video_color_sampling",
-        name="Video color sampling",
+        translation_key="video_color_sampling",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("video_color_sampling"),
+        value_fn=lambda device: device.automation.video_color_sampling,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="screen_mask_ratio",
-        name="Screen mask ratio",
+        translation_key="screen_mask_ratio",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("screen_mask_ratio"),
+        value_fn=lambda device: device.automation.screen_mask_ratio,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="screen_mask_top_trim_rel",
-        name="Screen mask top trim rel",
+        translation_key="screen_mask_top_trim_rel",
         entity_category=EntityCategory.DIAGNOSTIC,
         native_unit_of_measurement=PERCENTAGE,
-        value_fn=lambda state: state.get("screen_mask_top_trim_rel"),
+        value_fn=lambda device: device.automation.screen_mask_top_trim_rel / 10.0,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="screen_mask_bottom_trim_rel",
-        name="Screen mask bottom trim rel",
+        translation_key="screen_mask_bottom_trim_rel",
         entity_category=EntityCategory.DIAGNOSTIC,
         native_unit_of_measurement=PERCENTAGE,
-        value_fn=lambda state: state.get("screen_mask_bottom_trim_rel"),
+        value_fn=lambda device: device.automation.screen_mask_bottom_trim_rel / 10.0,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="screen_mask_conservative_ratio",
-        name="Screen mask conservative ratio",
+        translation_key="screen_mask_conservative_ratio",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("screen_mask_conservative_ratio"),
+        value_fn=lambda device: device.automation.screen_mask_conservative_ratio,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="screen_mask_top_mask_abs",
-        name="Screen mask top mask abs",
+        translation_key="screen_mask_top_mask_abs",
         entity_category=EntityCategory.DIAGNOSTIC,
         native_unit_of_measurement=PERCENTAGE,
-        value_fn=lambda state: state.get("screen_mask_top_mask_abs"),
+        value_fn=lambda device: device.automation.screen_mask_top_mask_abs / 10.0,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="screen_mask_bottom_mask_abs",
-        name="Screen mask bottom mask abs",
+        translation_key="screen_mask_bottom_mask_abs",
         entity_category=EntityCategory.DIAGNOSTIC,
         native_unit_of_measurement=PERCENTAGE,
-        value_fn=lambda state: state.get("screen_mask_bottom_mask_abs"),
+        value_fn=lambda device: device.automation.screen_mask_bottom_mask_abs / 10.0,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="cinemascape_mode",
-        name="Cinemascape mode",
+        translation_key="cinemascape_mode",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("cinemascape_mode"),
+        value_fn=lambda device: device.automation.cinemascape_mode,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="cinemascape_mask",
-        name="Cinemascape mask",
+        translation_key="cinemascape_mask",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("cinemascape_mask"),
+        value_fn=lambda device: device.automation.cinemascape_mask,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="ui_screen",
-        name="Ui screen",
+        translation_key="ui_screen",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("ui_screen"),
+        value_fn=lambda device: device.osd.ui_screen,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="ui_popup",
-        name="Ui popup",
+        translation_key="ui_popup",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("ui_popup"),
+        value_fn=lambda device: device.osd.ui_popup,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="ui_dialog",
-        name="Ui dialog",
+        translation_key="ui_dialog",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("ui_dialog"),
+        value_fn=lambda device: device.osd.ui_dialog,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="title_location",
-        name="Title location",
+        translation_key="title_location",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("title_location"),
+        value_fn=lambda device: device.movie.title_location,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="title_length",
-        name="Title length",
+        translation_key="title_length",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("title_length"),
+        value_fn=lambda device: device.movie.title_length,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="chapter_location",
-        name="Chapter location",
+        translation_key="chapter_location",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("chapter_location"),
+        value_fn=lambda device: device.movie.chapter_location,
     ),
-    KaleidescapeSensorDescription(
+    KaleidescapeSensorEntityDescription(
         key="chapter_length",
-        name="Chapter length",
+        translation_key="chapter_length",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda state: state.get("chapter_length"),
+        value_fn=lambda device: device.movie.chapter_length,
     ),
 )
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: KaleidescapeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    coordinator: KaleidescapeSensorCoordinator = hass.data[DOMAIN][entry.entry_id][
-        "sensor_coordinator"
-    ]
-    is_movie_player: bool = hass.data[DOMAIN][entry.entry_id][DATA_IS_MOVIE_PLAYER]
-
-    sensor_types = SHARED_SENSOR_TYPES
-    if is_movie_player:
-        sensor_types += PLAYER_SENSOR_TYPES
-
+    """Set up the platform from a config entry."""
+    device = entry.runtime_data.device
     async_add_entities(
-        KaleidescapeSensorEntity(entry, coordinator, description) for description in sensor_types
+        KaleidescapeSensor(device, description) for description in SENSOR_TYPES
     )
 
 
-class KaleidescapeSensorEntity(CoordinatorEntity[KaleidescapeSensorCoordinator], SensorEntity):
-    _attr_has_entity_name = True
+class KaleidescapeSensor(KaleidescapeEntity, SensorEntity):
+    """Representation of a Kaleidescape sensor."""
 
-    entity_description: KaleidescapeSensorDescription
+    entity_description: KaleidescapeSensorEntityDescription
 
     def __init__(
         self,
-        entry: ConfigEntry,
-        coordinator: KaleidescapeSensorCoordinator,
-        description: KaleidescapeSensorDescription,
+        device: KaleidescapeDevice,
+        entity_description: KaleidescapeSensorEntityDescription,
     ) -> None:
-        super().__init__(coordinator)
-        self._entry = entry
-        self.entity_description = description
-        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-
-    @property
-    def device_info(self):
-        device_type = self.hass.data[DOMAIN][self._entry.entry_id].get(
-            DATA_DEVICE_TYPE, "Kaleidescape"
-        )
-        return {
-            "identifiers": {(DOMAIN, self._entry.entry_id)},
-            "manufacturer": "Kaleidescape",
-            "model": str(device_type),
-            "name": self._entry.data.get(CONF_NAME, DEFAULT_NAME),
-        }
+        super().__init__(device)
+        self.entity_description = entity_description
+        self._attr_unique_id = f"{self._attr_unique_id}-{entity_description.key}"
 
     @property
     def native_value(self) -> StateType:
-        if not self.coordinator.data:
-            return None
-        return self.entity_description.value_fn(self.coordinator.data)
+        """Return value of sensor."""
+        return self.entity_description.value_fn(self._device)

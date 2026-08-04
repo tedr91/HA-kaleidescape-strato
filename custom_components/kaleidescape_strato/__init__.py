@@ -1,95 +1,126 @@
 from __future__ import annotations
 
-import logging
-from typing import Any
+from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.const import CONF_HOST, EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import Event, HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
+from kaleidescape import Device as KaleidescapeDevice
+from kaleidescape import KaleidescapeError
 
-from .api import KaleidescapeClient
+from .api import KaleidescapeRawClient
 from .const import (
+    CONF_ALLOW_RAW_COMMANDS,
     CONF_DEBUG_COMMANDS,
-    DATA_DEVICE_TYPE,
-    DATA_IS_MOVIE_PLAYER,
+    DEFAULT_ALLOW_RAW_COMMANDS,
     DEFAULT_DEBUG_COMMANDS,
     DEFAULT_PORT,
     DEFAULT_TIMEOUT,
-    DOMAIN,
     PLATFORMS,
 )
-from .coordinator import KaleidescapeSensorCoordinator
 
-KaleidescapeConfigEntry = ConfigEntry
 
-_LOGGER = logging.getLogger(__name__)
-DATA_LOADED_PLATFORMS = "loaded_platforms"
+@dataclass
+class KaleidescapeRuntimeData:
+    """Runtime data for a Kaleidescape config entry."""
+
+    device: KaleidescapeDevice
+    raw_client: KaleidescapeRawClient
+    allow_raw_commands: bool
+
+
+type KaleidescapeConfigEntry = ConfigEntry[KaleidescapeRuntimeData]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> bool:
-    hass.data.setdefault(DOMAIN, {})
-
-    client = KaleidescapeClient(
-        host=entry.data["host"],
-        port=entry.data.get("port", DEFAULT_PORT),
-        timeout=entry.data.get("timeout", DEFAULT_TIMEOUT),
-        debug_commands=entry.options.get(CONF_DEBUG_COMMANDS, DEFAULT_DEBUG_COMMANDS),
+    """Set up Kaleidescape from a config entry."""
+    host = entry.data[CONF_HOST]
+    device = KaleidescapeDevice(
+        host, timeout=DEFAULT_TIMEOUT, reconnect=True, reconnect_delay=DEFAULT_TIMEOUT
     )
-    is_movie_player = True
-    device_type = "Kaleidescape"
-    try:
-        is_movie_player, device_type = await client.async_get_device_profile()
-    except Exception:
-        _LOGGER.debug("Unable to detect Kaleidescape device profile at setup", exc_info=True)
 
-    coordinator = KaleidescapeSensorCoordinator(
-        hass,
-        entry,
-        client,
-        include_player_metrics=is_movie_player,
+    try:
+        await device.connect()
+    except (KaleidescapeError, ConnectionError) as err:
+        await device.disconnect()
+        raise ConfigEntryNotReady(f"Unable to connect to {host}: {err}") from err
+
+    debug_commands = entry.options.get(CONF_DEBUG_COMMANDS, DEFAULT_DEBUG_COMMANDS)
+    raw_client = KaleidescapeRawClient(
+        host=host,
+        port=DEFAULT_PORT,
+        timeout=DEFAULT_TIMEOUT,
+        debug_commands=debug_commands,
     )
-    try:
-        await coordinator.async_refresh()
-    except Exception:
-        _LOGGER.debug("Initial Kaleidescape sensor refresh failed", exc_info=True)
 
-    hass.data[DOMAIN][entry.entry_id] = {
-        "client": client,
-        "sensor_coordinator": coordinator,
-        DATA_IS_MOVIE_PLAYER: is_movie_player,
-        DATA_DEVICE_TYPE: device_type,
-    }
+    entry.runtime_data = KaleidescapeRuntimeData(
+        device=device,
+        raw_client=raw_client,
+        allow_raw_commands=entry.options.get(
+            CONF_ALLOW_RAW_COMMANDS, DEFAULT_ALLOW_RAW_COMMANDS
+        ),
+    )
 
-    loaded_platforms: list[Any] = []
-    for platform in PLATFORMS:
-        try:
-            await hass.config_entries.async_forward_entry_setups(entry, [platform])
-            loaded_platforms.append(platform)
-        except Exception:
-            _LOGGER.exception(
-                "Failed to set up Kaleidescape platform '%s' for entry %s",
-                platform,
-                entry.entry_id,
-            )
+    async def disconnect(event: Event) -> None:
+        await device.disconnect()
 
-    if not loaded_platforms:
-        _LOGGER.error("No Kaleidescape platforms could be set up for entry %s", entry.entry_id)
-        hass.data[DOMAIN].pop(entry.entry_id, None)
-        return False
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, disconnect)
+    )
+    entry.async_on_unload(device.disconnect)
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
-    hass.data[DOMAIN][entry.entry_id][DATA_LOADED_PLATFORMS] = loaded_platforms
-    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> bool:
-    entry_data = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-    loaded_platforms = entry_data.get(DATA_LOADED_PLATFORMS, PLATFORMS)
-    unloaded = await hass.config_entries.async_unload_platforms(entry, loaded_platforms)
-    if unloaded:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
-    return unloaded
+    """Unload config entry."""
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-async def async_reload_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> None:
-    await async_unload_entry(hass, entry)
-    await async_setup_entry(hass, entry)
+async def _async_update_listener(
+    hass: HomeAssistant, entry: KaleidescapeConfigEntry
+) -> None:
+    """Reload the entry when options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+@dataclass
+class KaleidescapeDeviceInfo:
+    """Metadata for a Kaleidescape device."""
+
+    host: str
+    serial: str
+    name: str
+    model: str
+    server_only: bool
+
+
+class UnsupportedError(HomeAssistantError):
+    """Error for unsupported device types."""
+
+
+async def validate_host(host: str) -> KaleidescapeDeviceInfo:
+    """Validate device host."""
+    device = KaleidescapeDevice(host)
+
+    try:
+        await device.connect()
+    except (KaleidescapeError, ConnectionError):
+        await device.disconnect()
+        raise
+
+    info = KaleidescapeDeviceInfo(
+        host=device.host,
+        serial=device.system.serial_number,
+        name=device.system.friendly_name,
+        model=device.system.type,
+        server_only=device.is_server_only,
+    )
+
+    await device.disconnect()
+
+    return info
