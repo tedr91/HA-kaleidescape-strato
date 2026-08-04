@@ -8,6 +8,8 @@ from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from kaleidescape import Device as KaleidescapeDevice
 from kaleidescape import KaleidescapeError
+from kaleidescape import __version__ as _PYKALEIDESCAPE_VERSION
+from kaleidescape import device as _kaleidescape_device
 
 from .api import KaleidescapeRawClient
 from .const import (
@@ -19,6 +21,16 @@ from .const import (
     DEFAULT_TIMEOUT,
     PLATFORMS,
 )
+
+
+def _patched_pkg_version(*_args: object, **_kwargs: object) -> str:
+    """Return the pinned pykaleidescape version without touching the filesystem."""
+    return _PYKALEIDESCAPE_VERSION
+
+
+# pykaleidescape 1.1.6 calls importlib.metadata.version() during device.connect(),
+# a blocking disk read in the event loop. Fixed upstream but unreleased.
+_kaleidescape_device.pkg_version = _patched_pkg_version
 
 
 @dataclass
