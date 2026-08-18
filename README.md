@@ -61,6 +61,11 @@ and the legacy device identifier migrates in place when possible. If current ent
 or a current device already exist, stale entity rows are removed and surviving entities
 are linked to the current device before the legacy device is removed.
 
+Version 1.0.4 also normalizes whitespace in serial numbers reported through SSDP and
+the player API. This prevents Home Assistant from repeatedly offering an already
+configured player when Kaleidescape publishes its UPnP serial with an embedded space,
+and normalizes affected config entry unique IDs during upgrade.
+
 The migration never changes config entry titles, device or entity names, areas, labels,
 or entity IDs. If the serial number cannot be resolved from the registries, config entry,
 or player, migration stops without changing the config entry version and Home Assistant

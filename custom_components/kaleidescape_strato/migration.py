@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 
+def normalize_serial(value: str) -> str:
+    """Remove whitespace from a Kaleidescape serial number."""
+    return "".join(value.split())
+
+
 def is_legacy_unique_id(unique_id: str | None) -> bool:
     """Return whether a config entry unique ID predates serial-based IDs."""
     if not unique_id:
         return True
 
     normalized = unique_id.lower()
-    return normalized.startswith(("udn:", "uuid:")) or ":" in unique_id
+    return (
+        normalized.startswith(("udn:", "uuid:"))
+        or ":" in unique_id
+        or normalize_serial(unique_id) != unique_id
+    )
 
 
 def _migrated_unique_id(

@@ -16,6 +16,12 @@ MIGRATION = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MIGRATION)
 
 
+def test_normalizes_all_serial_whitespace() -> None:
+    assert MIGRATION.normalize_serial("0703 00000878") == "070300000878"
+    assert MIGRATION.normalize_serial(" 0703\t0000\n0878 ") == "070300000878"
+    assert MIGRATION.normalize_serial("070300000878") == "070300000878"
+
+
 def test_migrates_singleton_domains() -> None:
     assert (
         MIGRATION._migrated_unique_id(
@@ -59,4 +65,6 @@ def test_detects_legacy_config_entry_unique_ids() -> None:
     assert MIGRATION.is_legacy_unique_id("192.168.1.10:10000")
     assert MIGRATION.is_legacy_unique_id(None)
     assert MIGRATION.is_legacy_unique_id("")
+    assert MIGRATION.is_legacy_unique_id("0703 00000878")
+    assert MIGRATION.is_legacy_unique_id("0703\t00000878")
     assert not MIGRATION.is_legacy_unique_id("070300000878")

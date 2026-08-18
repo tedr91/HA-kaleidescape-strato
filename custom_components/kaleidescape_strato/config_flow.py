@@ -21,6 +21,7 @@ from .const import (
 from .const import (
     NAME as KALEIDESCAPE_NAME,
 )
+from .migration import normalize_serial
 
 ERROR_CANNOT_CONNECT = "cannot_connect"
 ERROR_UNSUPPORTED = "unsupported"
@@ -29,7 +30,7 @@ ERROR_UNSUPPORTED = "unsupported"
 class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow for Kaleidescape Strato integration."""
 
-    VERSION = 2
+    VERSION = 3
 
     discovered_device: KaleidescapeDeviceInfo
 
@@ -54,7 +55,9 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 host = info.host
 
-                await self.async_set_unique_id(info.serial, raise_on_progress=False)
+                await self.async_set_unique_id(
+                    normalize_serial(info.serial), raise_on_progress=False
+                )
                 self._abort_if_unique_id_configured(updates={CONF_HOST: host})
 
                 return self.async_create_entry(
@@ -73,7 +76,7 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle discovered device."""
         host = cast(str, urlparse(discovery_info.ssdp_location).hostname)
-        serial_number = discovery_info.upnp[ATTR_UPNP_SERIAL]
+        serial_number = normalize_serial(discovery_info.upnp[ATTR_UPNP_SERIAL])
 
         await self.async_set_unique_id(serial_number)
         self._abort_if_unique_id_configured(updates={CONF_HOST: host})
@@ -86,6 +89,11 @@ class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason=ERROR_CANNOT_CONNECT)
         except UnsupportedError:
             return self.async_abort(reason=ERROR_UNSUPPORTED)
+
+        await self.async_set_unique_id(
+            normalize_serial(self.discovered_device.serial)
+        )
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
 
         self.context.update(
             {

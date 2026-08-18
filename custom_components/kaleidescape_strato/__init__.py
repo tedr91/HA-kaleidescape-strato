@@ -25,7 +25,7 @@ from .const import (
     DOMAIN,
     PLATFORMS,
 )
-from .migration import _migrated_unique_id, is_legacy_unique_id
+from .migration import _migrated_unique_id, is_legacy_unique_id, normalize_serial
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,7 +56,19 @@ async def async_migrate_entry(
     hass: HomeAssistant, entry: KaleidescapeConfigEntry
 ) -> bool:
     """Migrate legacy config entry, entity, and device registry identities."""
-    if entry.version >= 2:
+    if entry.version >= 3:
+        return True
+
+    if entry.version == 2:
+        if not entry.unique_id:
+            _LOGGER.warning(
+                "Unable to normalize the missing unique ID for config entry %s",
+                entry.entry_id,
+            )
+            return False
+        hass.config_entries.async_update_entry(
+            entry, unique_id=normalize_serial(entry.unique_id), version=3
+        )
         return True
 
     device_registry = dr.async_get(hass)
@@ -82,6 +94,9 @@ async def async_migrate_entry(
             pass
         else:
             serial = info.serial
+
+    if serial is not None:
+        serial = normalize_serial(serial)
 
     if not serial:
         _LOGGER.warning(
@@ -137,9 +152,7 @@ async def async_migrate_entry(
             )
         device_registry.async_remove_device(legacy_device.id)
 
-    hass.config_entries.async_update_entry(
-        entry, unique_id=serial, version=2
-    )
+    hass.config_entries.async_update_entry(entry, unique_id=serial, version=3)
     return True
 
 
