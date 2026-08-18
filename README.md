@@ -52,6 +52,27 @@ Home Assistant will install the `pykaleidescape` dependency automatically.
 4. Find **Kaleidescape Strato** in HACS and install it.
 5. Restart Home Assistant and add the integration from **Settings → Devices & Services**.
 
+## Upgrading from v1.0.0
+
+Version 1.0.3 repairs registry identities that changed without migration in v1.0.1.
+On the next Home Assistant restart, existing v1.0.0 config entries migrate to the
+player serial number, legacy entity unique IDs migrate to their serial-based forms,
+and the legacy device identifier migrates in place when possible. If current entities
+or a current device already exist, stale entity rows are removed and surviving entities
+are linked to the current device before the legacy device is removed.
+
+The migration never changes config entry titles, device or entity names, areas, labels,
+or entity IDs. If the serial number cannot be resolved from the registries, config entry,
+or player, migration stops without changing the config entry version and Home Assistant
+retries it on a later restart.
+
+The hardcoded `Theater` suggested area has also been removed. Home Assistant Core marks
+`suggested_area` as deprecated and scheduled for removal in 2026.9. Existing area
+assignments are not changed; new devices are left unassigned until the user chooses an
+area. The player serial number is now included in device metadata, and stale devices can
+be removed from the Home Assistant device registry when they do not match a verified
+live serial number.
+
 ## Options
 
 Open **Settings → Devices & Services → Kaleidescape Strato → Configure**:

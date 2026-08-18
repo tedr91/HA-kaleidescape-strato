@@ -29,7 +29,7 @@ ERROR_UNSUPPORTED = "unsupported"
 class KaleidescapeStratoConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow for Kaleidescape Strato integration."""
 
-    VERSION = 1
+    VERSION = 2
 
     discovered_device: KaleidescapeDeviceInfo
 

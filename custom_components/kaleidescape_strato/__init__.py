@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from kaleidescape import Device as KaleidescapeDevice
 from kaleidescape import KaleidescapeError
 from kaleidescape import __version__ as _PYKALEIDESCAPE_VERSION
@@ -19,8 +22,12 @@ from .const import (
     DEFAULT_DEBUG_COMMANDS,
     DEFAULT_PORT,
     DEFAULT_TIMEOUT,
+    DOMAIN,
     PLATFORMS,
 )
+from .migration import _migrated_unique_id, is_legacy_unique_id
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _patched_pkg_version(*_args: object, **_kwargs: object) -> str:
@@ -43,6 +50,114 @@ class KaleidescapeRuntimeData:
 
 
 type KaleidescapeConfigEntry = ConfigEntry[KaleidescapeRuntimeData]
+
+
+async def async_migrate_entry(
+    hass: HomeAssistant, entry: KaleidescapeConfigEntry
+) -> bool:
+    """Migrate legacy config entry, entity, and device registry identities."""
+    if entry.version >= 2:
+        return True
+
+    device_registry = dr.async_get(hass)
+    serial = next(
+        (
+            identifier
+            for device in dr.async_entries_for_config_entry(
+                device_registry, entry.entry_id
+            )
+            for domain, identifier in device.identifiers
+            if domain == DOMAIN and identifier != entry.entry_id
+        ),
+        None,
+    )
+
+    if serial is None and entry.unique_id and not is_legacy_unique_id(entry.unique_id):
+        serial = entry.unique_id
+
+    if serial is None and (host := entry.data.get(CONF_HOST)):
+        try:
+            info = await validate_host(host)
+        except Exception:  # noqa: BLE001
+            pass
+        else:
+            serial = info.serial
+
+    if not serial:
+        _LOGGER.warning(
+            "Unable to resolve the serial number while migrating config entry %s",
+            entry.entry_id,
+        )
+        return False
+
+    entity_registry = er.async_get(hass)
+    existing_keys = {
+        (entity.domain, entity.platform, entity.unique_id)
+        for entity in er.async_entries_for_config_entry(
+            entity_registry, entry.entry_id
+        )
+    }
+    collisions: set[str] = set()
+
+    def migrate_entity(entity: er.RegistryEntry) -> dict[str, str] | None:
+        new_unique_id = _migrated_unique_id(
+            entity.domain, entity.unique_id, entry.entry_id, serial
+        )
+        if new_unique_id is None:
+            return None
+        if (entity.domain, entity.platform, new_unique_id) in existing_keys:
+            collisions.add(entity.entity_id)
+            return None
+        return {"new_unique_id": new_unique_id}
+
+    await er.async_migrate_entries(hass, entry.entry_id, migrate_entity)
+    for entity_id in collisions:
+        entity_registry.async_remove(entity_id)
+
+    legacy_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, entry.entry_id)}
+    )
+    current_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, serial)}
+    )
+    if legacy_device is not None and current_device is None:
+        device_registry.async_update_device(
+            legacy_device.id, new_identifiers={(DOMAIN, serial)}
+        )
+    elif (
+        legacy_device is not None
+        and current_device is not None
+        and legacy_device.id != current_device.id
+    ):
+        for entity in er.async_entries_for_device(
+            entity_registry, legacy_device.id, include_disabled_entities=True
+        ):
+            entity_registry.async_update_entity(
+                entity.entity_id, device_id=current_device.id
+            )
+        device_registry.async_remove_device(legacy_device.id)
+
+    hass.config_entries.async_update_entry(
+        entry, unique_id=serial, version=2
+    )
+    return True
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    config_entry: KaleidescapeConfigEntry,
+    device_entry: dr.DeviceEntry,
+) -> bool:
+    """Allow stale devices to be removed while protecting a verified live device."""
+    live: set[tuple[str, str]] = set()
+    if config_entry.unique_id and not is_legacy_unique_id(config_entry.unique_id):
+        live.add((DOMAIN, config_entry.unique_id))
+
+    runtime = getattr(config_entry, "runtime_data", None)
+    if runtime is not None and (serial := runtime.device.serial_number):
+        live.add((DOMAIN, serial))
+
+    return not (device_entry.identifiers & live)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: KaleidescapeConfigEntry) -> bool:

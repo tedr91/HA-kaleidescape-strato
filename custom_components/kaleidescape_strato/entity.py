@@ -29,8 +29,8 @@ class KaleidescapeEntity(Entity):
             name=f"{NAME} {device.system.friendly_name}",
             model=device.system.type,
             manufacturer=NAME,
+            serial_number=device.serial_number,
             sw_version=f"{device.system.kos_version}",
-            suggested_area="Theater",
             configuration_url=f"http://{device.host}",
         )
 
